@@ -1,0 +1,12 @@
+# directories :
+CMakeFiles/
+output_data/
+
+# executables :
+raytracing
+
+# cmake-related :
+CMakeLists.txt
+CMakeCache.txt
+Makefile
+cmake_install.cmake
