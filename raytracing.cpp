@@ -10,7 +10,9 @@
 #include <CGAL/Polygon_mesh_processing/compute_normal.h>
 #include <CGAL/Polygon_mesh_processing/orientation.h>
 #include <CGAL/Polygon_mesh_processing/measure.h>
+#include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
 #include <CGAL/Point_set_3.h>
+#include <CGAL/IO/OBJ_reader.h>
 typedef CGAL::Simple_cartesian<double> K;
 typedef K::FT FT;
 typedef K::Point_3 Point;
@@ -61,17 +63,7 @@ void write_point_set_to_file(const Point_set& point_set, std::string file_name){
 		Point P = point_set.point(*it);
 		outputFile << P << std::endl;
 	}
-}
-
-void test(){
-	std::cerr << "beginning of test : " << std::endl;
-	double d(4.5);
-	Point P1(4,10,10);
-	Point P2(5,18,-4);
-	Point P3(0,14,5);
-	// Point c = CGAL::centroid(P1,P2,P3);
-	// std::cerr << "centroid : " << P << std::endl;
-	std::cerr << "end of test : " << std::endl;
+	std::cout << "wrote : " << file_name << std::endl << std::endl;
 }
 
 Point centroid(const Mesh mesh){
@@ -96,6 +88,8 @@ Point centroid(const Mesh mesh){
 }
 
 Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi){
+	std::cout << "Started Spherical Ray Shooting" << std::endl;
+
 	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
 	Point_set point_set; // for rayshooting output storage
 	double thetaMin=0; double thetaMax=M_PI; // polar angle theta in [0,pi]
@@ -119,74 +113,87 @@ Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi){
 			}
 		}
 	}
+	std::cout << "Done with Spherical Ray Shooting" << std::endl << std::endl;
 	return point_set;
 }
 
 Mesh read_OFF_mesh(const char* fileName){
-	std::ifstream input(fileName);
+	std::ifstream is (fileName, std::ifstream::in);
 	Mesh mesh;
-	input >> mesh;
+	is >> mesh;
+	// read_off(is, mesh);
 	return mesh;
 }
 
-Mesh read_OFF_mesh2(const char* fileName){
+Mesh read_OBJ_mesh(const char* fileName){
+	std::cout << "READING : " << fileName << std::endl;
 	Mesh mesh;
-	std::filebuf fb; // Stream buffer to read from and write to files
-	if (fb.open (fileName, std::ios::in)){
-		std::istream is(&fb);
-		// is >> mesh;
-		read_off(is, mesh);
+	// Variables to store polygon soup :
+	std::ifstream is (fileName, std::ifstream::in);
+	std::vector<Point> points;
+	std::vector<std::vector<std::size_t>> polygons;
+
+	// Extract points and polygons from stream 'is' :
+	CGAL::read_OBJ(is, points, polygons);	
+	std::cout << "number of points : " << points.size() << std::endl;
+	std::cout << "number of polygons : " << polygons.size() << std::endl;
+
+	// Processing polygon soup :
+	if (!CGAL::Polygon_mesh_processing::is_polygon_soup_a_polygon_mesh(polygons))
+	{
+		// polygons do not define a valid mesh
+		std::cout << "Warning: [" << fileName << "] does not define a valid polygon mesh " << std::endl;
+		if ( !CGAL::Polygon_mesh_processing::orient_polygon_soup(points, polygons) ){ // try to orient
+			// orientation failed
+			std::cout << "Warning: the orientation of the polygon soup ["
+			<< fileName << "] failed. => Points were duplicated." << std::endl;
+		} else {
+			// orientation succeeded
+			std::cout << "orientation of the polygon soup [" << fileName << "] was a success." << std::endl;
+		}
 	} else {
-		std::cout << "Error: impossible to read " << fileName << std::endl;
+		// polygons define a valid mesh
+		std::cout << "Success: [" << fileName << "] defines a valid polygon mesh " << std::endl;
+	}
+
+	CGAL::Polygon_mesh_processing::polygon_soup_to_polygon_mesh(points, polygons, mesh);
+
+	std::cout << "Number of points : " << mesh.number_of_vertices() << std::endl;
+	std::cout << "Number of faces : " << mesh.number_of_faces() << std::endl;
+	std::cout << "Done with reading" << std::endl << std::endl;
+
+	return mesh;
+}
+
+Mesh read_input_file(const char* fileName){
+	/*
+	Use the proper function absed on the extension of the input file
+	*/
+	Mesh mesh;
+	std::string extension = std::string(fileName).substr(std::string(fileName).find_last_of(".") + 1);
+	if (extension == "obj"){
+		mesh = read_OBJ_mesh(fileName);
+	} else if (extension == "off") {
+		mesh = read_OFF_mesh(fileName);
+	} else {
+		std::cout << "Error: extension [." << extension << "] not readable." << std::endl;
 	}
 	return mesh;
 }
 
-// Mesh read_PLY_mesh(const char* fileName){
-// 	Mesh mesh;
-// 	std::filebuf fb; // Stream buffer to read from and write to files
-// 	if (fb.open (fileName, std::ios::in)){
-// 		std::istream is(&fb);
-// 		// is >> mesh;
-// 		// CGAL::read_ply(is, mesh);
-// 	} else {
-// 		std::cout << "Error: impossible to read " << fileName << std::endl;
-// 	}
-// 	return mesh;
-// }
-
 int main(int argc, char* argv[])
 {
-  const char* filename = (argc > 1) ? argv[1] : "input_data/tetrahedron.off";
+  // const char* filename = (argc > 1) ? argv[1] : "input_data/tetrahedron.off";
   // const char* filename = (argc > 1) ? argv[1] : "input_data/crocodile_statue.ply";
-  Mesh mesh = read_OFF_mesh(filename);
-  Point cent(0.25, 0.25, 0.25);
-  Point_set point_set = spherical_ray_shooting(mesh, cent, 100, 200);
+  // const char* filename = (argc > 1) ? argv[1] : "input_data/open_data_strasbourg/PC3E45/PC3E45_3.obj";
+  //const char* filename = (argc > 1) ? argv[1] : "input_data/cube.obj";
+  const char* filename = (argc > 1) ? argv[1] : "input_data/cow.obj";
+  Mesh mesh = read_input_file(filename);
+
+  // Point origin_lidar(centroid(mesh));
+  Point origin_lidar(-2, 2, 2);
+  Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, 150, 300);
   write_point_set_to_file(point_set, "out_pcd.off");
-
-  Point A(centroid(mesh));
-  std::cout << "centroid A : " << A << std::endl;
-  
-  // Tree tree(faces(mesh).first, faces(mesh).second, mesh);
-  // double d = CGAL::Polygon_mesh_processing::is_outward_oriented(mesh)?-1:1;
-  // for(face_descriptor fd : faces(mesh)){
-  //   halfedge_descriptor hd = halfedge(fd,mesh);
-  //   Point p = CGAL::centroid(mesh.point(source(hd,mesh)),
-  //                            mesh.point(target(hd,mesh)),
-  //                            mesh.point(target(next(hd,mesh),mesh)));
-  //   Vector v = CGAL::Polygon_mesh_processing::compute_face_normal(fd,mesh);
-  //   Ray ray(p,d * v);
-  //   Skip skip(fd);
-  //   Ray_intersection intersection = tree.first_intersection(ray, skip);
-  //   if(intersection){
-  //     if(boost::get<Point>(&(intersection->first))){
-  //       const Point* p =  boost::get<Point>(&(intersection->first) );
-  //       std::cout <<  *p << std::endl;
-  //     }
-  //   }
-  // }
-
-  // test();
 
   std::cerr << "done" << std::endl;
   return 0;
