@@ -1,6 +1,7 @@
 # directories :
 CMakeFiles/
 output_data/
+input_data/heavy/
 
 # executables :
 raytracing
@@ -10,6 +11,3 @@ CMakeLists.txt
 CMakeCache.txt
 Makefile
 cmake_install.cmake
-
-# 3D models :
-input_data/crocodile_statue.ply
