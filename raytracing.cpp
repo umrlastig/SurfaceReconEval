@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <string>
 #include <math.h>
 #include <CGAL/Simple_cartesian.h>
 #include <CGAL/AABB_tree.h>
@@ -23,6 +24,7 @@ typedef CGAL::AABB_traits<K, Primitive> Traits;
 typedef CGAL::AABB_tree<Traits> Tree;
 typedef boost::optional<Tree::Intersection_and_primitive_id<Ray>::Type> Ray_intersection;
 typedef CGAL::Point_set_3<Point> Point_set;
+typedef Mesh::Face_range Face_range;
 
 struct Skip {
   face_descriptor fd;
@@ -37,82 +39,134 @@ struct Skip {
   }
 };
 
-// double* angles(double ang[], double start, double stop, int n){
-//   for (int i=0; i<n; i++){
-//     ang[i] = 23;
-//   }
-//   return ang;
-// }
-// void display(double tab[], int size){
-//   std::cout << "elements of tab :" << std::endl;
-//   for (int i=0; i<size; i++){
-//     std::cout << tab[i] << std::endl;
-//   }
-//   std::cout << "=================" << std::endl;
-// }
 
 double angle(int k, double start, double stop, int n){
 	return start + (2*k + 1)*(stop - start)/(2*n);
 }
 
+void print_point_set(const Point_set& point_set){
+	std::cerr << "Content of point set :" << std::endl;
+	for (Point_set::const_iterator it = point_set.begin(); it != point_set.end(); it++){
+		Point P = point_set.point(*it);
+		std::cerr << "Point " << *it << " : " << P << std::endl;
+	}
+}
+
+void write_point_set_to_file(const Point_set& point_set, std::string file_name){
+	std::ofstream outputFile("output_data/" + file_name);
+	outputFile << "OFF" << std::endl; // header
+	std::size_t nPts = point_set.size();
+	outputFile << nPts << " 0 0" << std::endl; // nb of vertices, faces and edges
+	for (Point_set::const_iterator it = point_set.begin(); it != point_set.end(); it++){
+		Point P = point_set.point(*it);
+		outputFile << P << std::endl;
+	}
+}
+
+void test(){
+	std::cerr << "beginning of test : " << std::endl;
+	double d(4.5);
+	Point P1(4,10,10);
+	Point P2(5,18,-4);
+	Point P3(0,14,5);
+	// Point c = CGAL::centroid(P1,P2,P3);
+	// std::cerr << "centroid : " << P << std::endl;
+	std::cerr << "end of test : " << std::endl;
+}
+
+Point centroid(const Mesh mesh){
+	double areaM = 0; // total area of mesh
+	Point cM = Point(0,0,0); // centroid of mesh
+	for( face_descriptor fd : faces(mesh) ){
+		// area of face fd :
+		double areaT = CGAL::Polygon_mesh_processing::face_area(fd,mesh);
+
+		// centroid of face fd :
+		halfedge_descriptor hd = halfedge(fd,mesh);
+		Point cT = CGAL::centroid(mesh.point(source(hd,mesh)),
+								 mesh.point(target(hd,mesh)),
+								 mesh.point(target(next(hd,mesh),mesh)));
+
+		// update :
+		areaM += areaT;
+		Vector v = Vector(Point(0,0,0), cT).operator*=(areaT);
+		cM.operator+=(v);
+	}
+	return Point( cM.x(), cM.y(), cM.z(), areaM );
+}
+
+Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi){
+	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
+	Point_set point_set; // for rayshooting output storage
+	double thetaMin=0; double thetaMax=M_PI; // polar angle theta in [0,pi]
+	double phiMin=0; double phiMax=2*M_PI; // azimuthal angle phi in [0,2pi]
+	for (int kTheta=0; kTheta<nTheta; kTheta++){
+		double theta = angle(kTheta, thetaMin, thetaMax, nTheta);
+		for (int kPhi=0; kPhi<nPhi; kPhi++){
+			double phi = angle(kPhi, phiMin, phiMax, nPhi);
+			double x = sin(theta) * cos(phi);
+			double y = sin(theta) * sin(phi);
+			double z = cos(theta);
+			Vector dir = Vector(x,y,z);
+			Ray ray(origin, dir); // ray shooted
+
+			Ray_intersection intersection = tree.first_intersection(ray);
+			if(intersection){
+				if(boost::get<Point>(&(intersection->first))){
+					const Point* p =  boost::get<Point>(&(intersection->first) );
+					point_set.insert (*p);
+				}
+			}
+		}
+	}
+	return point_set;
+}
+
+Mesh read_OFF_mesh(const char* fileName){
+	std::ifstream input(fileName);
+	Mesh mesh;
+	input >> mesh;
+	return mesh;
+}
+
+Mesh read_OFF_mesh2(const char* fileName){
+	Mesh mesh;
+	std::filebuf fb; // Stream buffer to read from and write to files
+	if (fb.open (fileName, std::ios::in)){
+		std::istream is(&fb);
+		// is >> mesh;
+		read_off(is, mesh);
+	} else {
+		std::cout << "Error: impossible to read " << fileName << std::endl;
+	}
+	return mesh;
+}
+
+// Mesh read_PLY_mesh(const char* fileName){
+// 	Mesh mesh;
+// 	std::filebuf fb; // Stream buffer to read from and write to files
+// 	if (fb.open (fileName, std::ios::in)){
+// 		std::istream is(&fb);
+// 		// is >> mesh;
+// 		// CGAL::read_ply(is, mesh);
+// 	} else {
+// 		std::cout << "Error: impossible to read " << fileName << std::endl;
+// 	}
+// 	return mesh;
+// }
+
 int main(int argc, char* argv[])
 {
-  const char* filename = (argc > 1) ? argv[1] : "data/tetrahedron.off";
-  std::ifstream input(filename);
-  Mesh mesh;
-  input >> mesh;
-  Tree tree(faces(mesh).first, faces(mesh).second, mesh);
-  Point_set point_set;
-  std::ofstream outputFile("data/output_point_set.off");
-  outputFile << "OFF" << std::endl;
-
-
-
-  // std::cout << &mesh << std::endl;
-  // int nTheta=10;
-  // double a[nTheta];
-  // a = angles(a,0,10,nTheta);
-  // display(a, nTheta);
-  // std::cout << a << std::endl;
-
-  // Point b=mesh.vertices().begin();
-  // for (Mesh::Vertex_index a : mesh.vertices() ){
-  //   std::cout << "test" << std::endl;
-  // }
-
-  // Point A=CGAL::Polygon_mesh_processing::centroid(mesh);
+  const char* filename = (argc > 1) ? argv[1] : "input_data/tetrahedron.off";
+  // const char* filename = (argc > 1) ? argv[1] : "input_data/crocodile_statue.ply";
+  Mesh mesh = read_OFF_mesh(filename);
   Point cent(0.25, 0.25, 0.25);
-  std::cout << cent << std::endl;
-  double radius = 10;
+  Point_set point_set = spherical_ray_shooting(mesh, cent, 100, 200);
+  write_point_set_to_file(point_set, "out_pcd.off");
 
-  double thetaMin=0; double thetaMax=M_PI; int nTheta = 100;
-  double phiMin=0; double phiMax=2*M_PI; int nPhi = 200;
-  int nPts = nPhi * nTheta;
-  outputFile << nPts << " 0 0" << std::endl; // nb of vertices, faces and edges
-
-  for (int kTheta=0; kTheta<nTheta; kTheta++){
-    double theta = angle(kTheta, thetaMin, thetaMax, nTheta);
-    for (int kPhi=0; kPhi<nPhi; kPhi++){
-    	double phi = angle(kPhi, phiMin, phiMax, nPhi);
-    	double x = sin(theta) * cos(phi);
-    	double y = sin(theta) * sin(phi);
-    	double z = cos(theta);
-    	Vector dir = Vector(x,y,z);
-    	Ray ray(cent, dir);
-    	Ray_intersection intersection = tree.first_intersection(ray);
-
-    	if(intersection){
-    		if(boost::get<Point>(&(intersection->first))){
-    			const Point* p =  boost::get<Point>(&(intersection->first) );
-    			point_set.insert (*p);
-    			outputFile << *p << std::endl;
-    			// std::cout <<  *p << std::endl;
-    		}
-    	}
-    }
-  }
-
-
+  Point A(centroid(mesh));
+  std::cout << "centroid A : " << A << std::endl;
+  
   // Tree tree(faces(mesh).first, faces(mesh).second, mesh);
   // double d = CGAL::Polygon_mesh_processing::is_outward_oriented(mesh)?-1:1;
   // for(face_descriptor fd : faces(mesh)){
@@ -132,7 +186,7 @@ int main(int argc, char* argv[])
   //   }
   // }
 
-
+  // test();
 
   std::cerr << "done" << std::endl;
   return 0;
