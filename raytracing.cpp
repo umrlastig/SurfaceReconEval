@@ -11,6 +11,7 @@
 #include <CGAL/Polygon_mesh_processing/orientation.h>
 #include <CGAL/Polygon_mesh_processing/measure.h>
 #include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
+#include <CGAL/Polygon_mesh_processing/bbox.h>
 #include <CGAL/Point_set_3.h>
 #include <CGAL/IO/OBJ_reader.h>
 typedef CGAL::Simple_cartesian<double> K;
@@ -88,7 +89,7 @@ Point centroid(const Mesh mesh){
 }
 
 Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi){
-	std::cout << "Started Spherical Ray Shooting" << std::endl;
+	std::cout << "Spherical Ray Shooting from position (" << origin << ")" << std::endl;
 
 	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
 	Point_set point_set; // for rayshooting output storage
@@ -189,9 +190,14 @@ int main(int argc, char* argv[])
   //const char* filename = (argc > 1) ? argv[1] : "input_data/cube.obj";
   const char* filename = (argc > 1) ? argv[1] : "input_data/cow.obj";
   Mesh mesh = read_input_file(filename);
+  CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh);
+  double x_origin = ( bbox.xmin() + bbox.xmax() ) / 2;
+  double y_origin = ( bbox.ymin() + bbox.ymax() ) / 2;
+  double z_origin = bbox.zmin() + 3*( bbox.zmax() - bbox.zmin() );
+  Point origin_lidar(x_origin, y_origin, z_origin);
 
   // Point origin_lidar(centroid(mesh));
-  Point origin_lidar(-2, 2, 2);
+  // Point origin_lidar(-2, 2, 2);
   Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, 150, 300);
   write_point_set_to_file(point_set, "out_pcd.off");
 

@@ -1,7 +1,14 @@
 # directories :
 CMakeFiles/
-output_data/
-input_data/heavy/
+input_data/heavy/*
+
+# directory content :
+output_data/*
+
+# exception :
+!output_data/.gitkeep
+!input_data/heavy/.gitkeep
+
 
 # executables :
 raytracing
@@ -11,3 +18,6 @@ CMakeLists.txt
 CMakeCache.txt
 Makefile
 cmake_install.cmake
+
+# emacs autosave files :
+\#*#
