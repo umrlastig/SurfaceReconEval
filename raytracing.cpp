@@ -14,6 +14,7 @@
 #include <CGAL/Polygon_mesh_processing/bbox.h>
 #include <CGAL/Point_set_3.h>
 #include <CGAL/IO/OBJ_reader.h>
+#include <CGAL/boost/graph/io.h>
 typedef CGAL::Simple_cartesian<double> K;
 typedef K::FT FT;
 typedef K::Point_3 Point;
@@ -190,6 +191,7 @@ int main(int argc, char* argv[])
   //const char* filename = (argc > 1) ? argv[1] : "input_data/cube.obj";
   const char* filename = (argc > 1) ? argv[1] : "input_data/cow.obj";
   Mesh mesh = read_input_file(filename);
+  CGAL::write_off("input_data/heavy/open_data_strasbourg/PC3E45/without_texture.off", mesh);
   CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh);
   double x_origin = ( bbox.xmin() + bbox.xmax() ) / 2;
   double y_origin = ( bbox.ymin() + bbox.ymax() ) / 2;
