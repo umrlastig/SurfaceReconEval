@@ -13,6 +13,7 @@
 #include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
 #include <CGAL/Polygon_mesh_processing/bbox.h>
 #include <CGAL/Point_set_3.h>
+#include <CGAL/Point_set_3/IO.h>
 #include <CGAL/IO/OBJ_reader.h>
 #include <CGAL/boost/graph/io.h>
 typedef CGAL::Simple_cartesian<double> K;
@@ -29,6 +30,9 @@ typedef CGAL::AABB_tree<Traits> Tree;
 typedef boost::optional<Tree::Intersection_and_primitive_id<Ray>::Type> Ray_intersection;
 typedef CGAL::Point_set_3<Point> Point_set;
 typedef Mesh::Face_range Face_range;
+// typedef boost::optional< Primitive_id > Primitive_id;
+typedef Tree::Primitive_id Primitive_id;
+
 
 struct Skip {
   face_descriptor fd;
@@ -54,18 +58,6 @@ void print_point_set(const Point_set& point_set){
 		Point P = point_set.point(*it);
 		std::cerr << "Point " << *it << " : " << P << std::endl;
 	}
-}
-
-void write_point_set_to_file(const Point_set& point_set, std::string file_name){
-	std::ofstream outputFile("output_data/" + file_name);
-	outputFile << "OFF" << std::endl; // header
-	std::size_t nPts = point_set.size();
-	outputFile << nPts << " 0 0" << std::endl; // nb of vertices, faces and edges
-	for (Point_set::const_iterator it = point_set.begin(); it != point_set.end(); it++){
-		Point P = point_set.point(*it);
-		outputFile << P << std::endl;
-	}
-	std::cout << "wrote : " << file_name << std::endl << std::endl;
 }
 
 Point centroid(const Mesh mesh){
@@ -94,6 +86,7 @@ Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi){
 
 	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
 	Point_set point_set; // for rayshooting output storage
+	point_set.add_normal_map(); // add normal property
 	double thetaMin=0; double thetaMax=M_PI; // polar angle theta in [0,pi]
 	double phiMin=0; double phiMax=2*M_PI; // azimuthal angle phi in [0,2pi]
 	for (int kTheta=0; kTheta<nTheta; kTheta++){
@@ -109,8 +102,11 @@ Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi){
 			Ray_intersection intersection = tree.first_intersection(ray);
 			if(intersection){
 				if(boost::get<Point>(&(intersection->first))){
-					const Point* p =  boost::get<Point>(&(intersection->first) );
-					point_set.insert (*p);
+					const Point& p = boost::get<Point>(intersection->first);					
+					const face_descriptor f = boost::get<face_descriptor>(intersection->second);
+					const Vector n = CGAL::Polygon_mesh_processing::compute_face_normal(f,mesh);
+					// point_set.insert (p);
+					point_set.insert(p,n); // A normal property must have been added to the point set before using this method
 				}
 			}
 		}
@@ -120,7 +116,7 @@ Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi){
 }
 
 Mesh read_OFF_mesh(const char* fileName){
-	std::ifstream is (fileName, std::ifstream::in);
+	std::ifstream is (fileName);
 	Mesh mesh;
 	is >> mesh;
 	// read_off(is, mesh);
@@ -131,7 +127,7 @@ Mesh read_OBJ_mesh(const char* fileName){
 	std::cout << "READING : " << fileName << std::endl;
 	Mesh mesh;
 	// Variables to store polygon soup :
-	std::ifstream is (fileName, std::ifstream::in);
+	std::ifstream is (fileName);
 	std::vector<Point> points;
 	std::vector<std::vector<std::size_t>> polygons;
 
@@ -183,25 +179,47 @@ Mesh read_input_file(const char* fileName){
 	return mesh;
 }
 
+void Strasbourg_Scene_Raytracing(int nTheta, int nPhi){
+	/*
+		Routine to raytrace the model PC3E45_3.obj from central position in x/y
+		and z = 3*bbox (above the model) and write the results to a ply pcd
+		with normals
+	*/
+	const char* filename = "input_data/heavy/open_data_strasbourg/PC3E45/PC3E45_3.obj";
+	Mesh mesh = read_input_file(filename);
+	CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh);
+	double x_origin = ( bbox.xmin() + bbox.xmax() ) / 2;
+	double y_origin = ( bbox.ymin() + bbox.ymax() ) / 2;
+	double z_origin = bbox.zmin() + 3*( bbox.zmax() - bbox.zmin() );
+	Point origin_lidar(x_origin, y_origin, z_origin);
+	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi);
+	std::ofstream of("output_data/out_pcd_normal_PC3E45_3.ply");
+	CGAL::write_ply_point_set(of,point_set);
+	std::cerr << "wrote output_data/out_pcd_normal_PC3E45_3.ply" << std::endl;
+}
+
+void object_raytracing_from_centroid(const char* filename, int nTheta, int nPhi){
+	/*
+		Routine to raytrace any closed object from its centroid and
+		write the results to a ply pcd with normals
+	*/
+	Mesh mesh = read_input_file(filename);
+	Point origin_lidar(centroid(mesh));
+	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi);
+	std::ofstream of("output_data/out_pcd_normal_00.off");
+	CGAL::write_off_point_set(of,point_set);
+	std::cerr << "wrote output_data/out_pcd_normal_00.off" << std::endl;
+
+	// just change the name of the file and user this function for a PLY pcd :
+	// CGAL::write_ply_point_set(ofPLY,point_set);
+}
+
 int main(int argc, char* argv[])
 {
-  // const char* filename = (argc > 1) ? argv[1] : "input_data/tetrahedron.off";
-  // const char* filename = (argc > 1) ? argv[1] : "input_data/crocodile_statue.ply";
-  // const char* filename = (argc > 1) ? argv[1] : "input_data/open_data_strasbourg/PC3E45/PC3E45_3.obj";
-  //const char* filename = (argc > 1) ? argv[1] : "input_data/cube.obj";
-  const char* filename = (argc > 1) ? argv[1] : "input_data/cow.obj";
-  Mesh mesh = read_input_file(filename);
-  CGAL::write_off("input_data/heavy/open_data_strasbourg/PC3E45/without_texture.off", mesh);
-  CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh);
-  double x_origin = ( bbox.xmin() + bbox.xmax() ) / 2;
-  double y_origin = ( bbox.ymin() + bbox.ymax() ) / 2;
-  double z_origin = bbox.zmin() + 3*( bbox.zmax() - bbox.zmin() );
-  Point origin_lidar(x_origin, y_origin, z_origin);
+  const char* filename = (argc > 1) ? argv[1] : "input_data/light/cube.obj"; 
+  object_raytracing_from_centroid(filename, 150, 300);
 
-  // Point origin_lidar(centroid(mesh));
-  // Point origin_lidar(-2, 2, 2);
-  Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, 150, 300);
-  write_point_set_to_file(point_set, "out_pcd.off");
+  // Strasbourg_Scene_Raytracing(150, 300);
 
   std::cerr << "done" << std::endl;
   return 0;
