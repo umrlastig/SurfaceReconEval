@@ -82,6 +82,19 @@ Point centroid(const Mesh mesh){
 }
 
 Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi){
+	/*
+		usage:
+			Shoot rays in all directions from a fixed position in space
+			and compute intersections with a mesh
+		input:
+			Mesh mesh: mesh to be raycasted/sampled
+			Point origin: The position from which the rays must be shooted
+			int nTheta: nb of polar angles in [0,pi] interval to generate
+			int nPhi: nb of azimuthal angles in [0,2pi] interval to generate
+		output:
+			Point_set point_set: intersections of the rays with the mesh
+
+	*/
 	std::cout << "Spherical Ray Shooting from position (" << origin << ")" << std::endl;
 
 	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
@@ -114,6 +127,87 @@ Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi){
 	std::cout << "Done with Spherical Ray Shooting" << std::endl << std::endl;
 	return point_set;
 }
+
+Vector normalize_vector_3(Vector &v){
+	double vx = v.x(); double vy = v.y(); double vz = v.z();
+	double norm_v = sqrt( pow(vx, 2) + pow(vy, 2) + pow(vz, 2) );
+	return Vector(vx, vy, vz, norm_v);
+}
+
+void compute_local_frame(Vector &AB, Vector &vec_i, Vector &vec_j, Vector &vec_k){
+	std::cout << "Computing local frame" << std::endl;
+	vec_k = normalize_vector_3(AB);
+
+	vec_j = CGAL::cross_product(Vector(0,0,1), vec_k);
+	vec_j = normalize_vector_3(vec_j);
+
+	vec_i = CGAL::cross_product(vec_j, vec_k);
+
+	std::cout << "vec_k : " << vec_k << std::endl;
+	std::cout << "vec_i : " << vec_i << std::endl;
+	std::cout << "vec_j : " << vec_j << std::endl << std::endl;
+}
+
+Point_set aerial_lidar(Mesh mesh, Point A, Point B, double v0, double omega, double theta_0, int nT){
+	/*
+		usage:
+			Simulate an aerial LiDAR acquisition
+		input:
+			Mesh mesh: mesh to be raycasted/sampled
+			Point A: starting point of the vehicle
+			Point B: ending point of the vehicle
+			double v0: speed of the vehicle
+			double omega: angular speed of the laser pointer
+			double theta_0: initial angle of the laser pointer
+			int nT: number of time samples
+		output:
+			Point_set point_set: intersections of the rays with the mesh
+
+	*/
+	std::cout << "Aerial LiDAR acquisition from (" << A << ") to (" << B << ")" << std::endl;
+
+	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
+	Point_set point_set; // for rayshooting output storage
+	point_set.add_normal_map(); // add normal property
+
+	Vector vec_i; Vector vec_j; Vector vec_k;
+ 	compute_local_frame(AB, vec_i, vec_j, vec_k);
+
+
+
+	for (int ti=0; ti<nT; ti++){
+		// compute t
+		// compute M
+		Vector dM = 
+		// M.operator+= (const Vector_3< Kernel > &v)
+		// compute ray
+	}
+	// for (int kTheta=0; kTheta<nTheta; kTheta++){
+	// 	double theta = angle(kTheta, thetaMin, thetaMax, nTheta);
+	// 	for (int kPhi=0; kPhi<nPhi; kPhi++){
+	// 		double phi = angle(kPhi, phiMin, phiMax, nPhi);
+	// 		double x = sin(theta) * cos(phi);
+	// 		double y = sin(theta) * sin(phi);
+	// 		double z = cos(theta);
+	// 		Vector dir = Vector(x,y,z);
+	// 		Ray ray(origin, dir); // ray shooted
+
+	// 		Ray_intersection intersection = tree.first_intersection(ray);
+	// 		if(intersection){
+	// 			if(boost::get<Point>(&(intersection->first))){
+	// 				const Point& p = boost::get<Point>(intersection->first);					
+	// 				const face_descriptor f = boost::get<face_descriptor>(intersection->second);
+	// 				const Vector n = CGAL::Polygon_mesh_processing::compute_face_normal(f,mesh);
+	// 				// point_set.insert (p);
+	// 				point_set.insert(p,n); // A normal property must have been added to the point set before using this method
+	// 			}
+	// 		}
+	// 	}
+	// }
+	std::cout << "Done with Spherical Ray Shooting" << std::endl << std::endl;
+	return point_set;
+}
+
 
 Mesh read_OFF_mesh(const char* fileName){
 	std::ifstream is (fileName);
@@ -217,9 +311,18 @@ void object_raytracing_from_centroid(const char* filename, int nTheta, int nPhi)
 int main(int argc, char* argv[])
 {
   const char* filename = (argc > 1) ? argv[1] : "input_data/light/cube.obj"; 
-  object_raytracing_from_centroid(filename, 150, 300);
+  // object_raytracing_from_centroid(filename, 150, 300);
 
   // Strasbourg_Scene_Raytracing(150, 300);
+  Vector AB(4,-6,5);
+  Vector vec_i;
+  Vector vec_j;
+  Vector vec_k;
+  compute_local_frame(AB, vec_i, vec_j, vec_k);
+
+  Vector test = Vector(30,30,60);
+  std::cout << normalize_vector_3(test) << std::endl;
+
 
   std::cerr << "done" << std::endl;
   return 0;
