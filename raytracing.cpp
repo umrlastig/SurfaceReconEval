@@ -30,8 +30,12 @@ typedef CGAL::AABB_tree<Traits> Tree;
 typedef boost::optional<Tree::Intersection_and_primitive_id<Ray>::Type> Ray_intersection;
 typedef CGAL::Point_set_3<Point> Point_set;
 typedef Mesh::Face_range Face_range;
-// typedef boost::optional< Primitive_id > Primitive_id;
 typedef Tree::Primitive_id Primitive_id;
+
+typedef Point_set::Property_map<double> X_Origin_Map;
+typedef Point_set::Property_map<double> Y_Origin_Map;
+typedef Point_set::Property_map<double> Z_Origin_Map;
+typedef Point_set::Property_map<Point> Point_origin_map;
 
 
 struct Skip {
@@ -80,53 +84,6 @@ Point centroid(const Mesh mesh){
 	return Point( cM.x(), cM.y(), cM.z(), areaM );
 }
 
-Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi){
-	/*
-		usage:
-			Shoot rays in all directions from a fixed position in space
-			and compute intersections with a mesh
-		input:
-			Mesh mesh: mesh to be raycasted/sampled
-			Point origin: The position from which the rays must be shooted
-			int nTheta: nb of polar angles in [0,pi] interval to generate
-			int nPhi: nb of azimuthal angles in [0,2pi] interval to generate
-		output:
-			Point_set point_set: intersections of the rays with the mesh
-
-	*/
-	std::cout << "Spherical Ray Shooting from position (" << origin << ")" << std::endl;
-
-	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
-	Point_set point_set; // for rayshooting output storage
-	point_set.add_normal_map(); // add normal property
-	double thetaMin=0; double thetaMax=M_PI; // polar angle theta in [0,pi]
-	double phiMin=0; double phiMax=2*M_PI; // azimuthal angle phi in [0,2pi]
-	for (int kTheta=0; kTheta<nTheta; kTheta++){
-		double theta = angle(kTheta, thetaMin, thetaMax, nTheta);
-		for (int kPhi=0; kPhi<nPhi; kPhi++){
-			double phi = angle(kPhi, phiMin, phiMax, nPhi);
-			double x = sin(theta) * cos(phi);
-			double y = sin(theta) * sin(phi);
-			double z = cos(theta);
-			Vector dir = Vector(x,y,z);
-			Ray ray(origin, dir); // ray shooted
-
-			Ray_intersection intersection = tree.first_intersection(ray);
-			if(intersection){
-				if(boost::get<Point>(&(intersection->first))){
-					const Point& p = boost::get<Point>(intersection->first);					
-					const face_descriptor f = boost::get<face_descriptor>(intersection->second);
-					const Vector n = CGAL::Polygon_mesh_processing::compute_face_normal(f,mesh);
-					// point_set.insert (p);
-					point_set.insert(p,n); // A normal property must have been added to the point set before using this method
-				}
-			}
-		}
-	}
-	std::cout << "Done with Spherical Ray Shooting" << std::endl << std::endl;
-	return point_set;
-}
-
 Vector normalize_vector_3(Vector &v){
 	double norm_v = sqrt(v.squared_length());
 	return v.operator/(norm_v);
@@ -146,20 +103,76 @@ void compute_local_frame(Vector &AB, Vector &vec_i, Vector &vec_j, Vector &vec_k
 	std::cout << "vec_j : [" << vec_j << "]" << std::endl << std::endl;
 }
 
-void compute_and_add_intersection(Mesh &mesh, Tree &tree, Ray &ray, Point_set &point_set){
+Point_set initialize_point_set(int &outProperty, X_Origin_Map &x_origin,
+												 Y_Origin_Map &y_origin,
+												 Z_Origin_Map &z_origin){
+	/*
+		Usage: Builds a Point_set object and add properties based on the value
+		of 'outProperty':
+			- 0: vertex position ONLY
+			- 1: vertex + NORMAL
+			- 2: vertex + OPTICAL CENTER
+	*/
+	Point_set point_set; // for rayshooting output storage
+	std::cout << "Output Point Cloud initialized with : ";
+	if (outProperty == 0){
+	std::cout << "Vertex position ONLY" << std::endl;
+
+	} else if (outProperty == 1) {
+		std::cout << "Vertex position + NORMAL" << std::endl;
+		point_set.add_normal_map(); // add normal property
+
+	} else if (outProperty == 2) {
+		std::cout << "Vertex position + OPTICAL CENTER" << std::endl;
+		bool success = false;
+		boost::tie (x_origin, success) = point_set.add_property_map<double>("x_origin", 0);
+		boost::tie (y_origin, success) = point_set.add_property_map<double>("y_origin", 0);
+		boost::tie (z_origin, success) = point_set.add_property_map<double>("z_origin", 0);
+		assert(success);
+	} else {
+		std::cerr << "Error: 'outProperty' argument not valid. Must be 0, 1 or 2" << std::endl;
+		std::cerr << "'outProperty' changed to 0 value" << std::endl;
+		outProperty = 0;
+	}
+	return point_set;
+}
+
+void add_desired_output_to_pcd(Mesh &mesh, Tree &tree, Point &M, Ray &ray, Point_set &point_set, int &outProperty, X_Origin_Map &x_origin,
+																												   Y_Origin_Map &y_origin,
+																												   Z_Origin_Map &z_origin){
+	/*
+		Usage: Computes the intersection of the ray with the mesh and adds to the point cloud:
+			   (based on the value of 'outProperty')
+			   		- 0: vertex position ONLY
+			 	 	- 1: vertex + NORMAL
+			 	 	- 2: vertex + OPTICAL CENTER
+	*/
 	Ray_intersection intersection = tree.first_intersection(ray);
 	if(intersection){
 		if(boost::get<Point>(&(intersection->first))){
-			const Point& p = boost::get<Point>(intersection->first);					
-			const face_descriptor f = boost::get<face_descriptor>(intersection->second);
-			const Vector n = CGAL::Polygon_mesh_processing::compute_face_normal(f,mesh);
-			// point_set.insert (p);
-			point_set.insert(p,n); // A normal property must have been added to the point set before using this method
+			const Point& p = boost::get<Point>(intersection->first);
+			if (outProperty == 0){
+				// only add point location :
+				point_set.insert (p);
+
+			} else if (outProperty == 1) {
+				// compute and add corresponding face normal :
+				const face_descriptor f = boost::get<face_descriptor>(intersection->second);
+				const Vector n = CGAL::Polygon_mesh_processing::compute_face_normal(f,mesh);
+				point_set.insert(p,n);
+
+			} else if (outProperty == 2) {
+				// add position of optical center :
+				Point_set::iterator it = point_set.insert(p);
+				x_origin[*it] = M.x();
+				y_origin[*it] = M.y();
+				z_origin[*it] = M.z();
+			}
 		}
 	}
 }
 
-Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0, double omega, double theta_0, double freq){
+Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0, double omega, double theta_0, double freq, int outProperty){
 	/*
 		usage:
 			Simulate an aerial LiDAR acquisition
@@ -172,14 +185,21 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0, double omega, 
 			double theta_0: initial angle of the laser pointer
 			double freq: frequency (time resolution) at which
 						 the analysis should be carried out
+			int outProperty: desired property of output point set:
+			 	 	- 0: vertex position ONLY
+			 	 	- 1: vertex + NORMAL
+			 	 	- 2: vertex + OPTICAL CENTER
 		output:
 			Point_set point_set: intersections of the rays with the mesh
 	*/
 	std::cout << "---> Aerial LiDAR acquisition from A(" << A << ") to B(" << B << ")" << std::endl;
 
 	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
-	Point_set point_set; // for rayshooting output storage
-	point_set.add_normal_map(); // add normal property
+
+	// Point Set initialization :
+	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
+	Point_set point_set = initialize_point_set(outProperty, x_origin, y_origin, z_origin);
+	Point_set positionsM;
 
 	Vector AB = Vector(A,B);
 	Vector vec_i; Vector vec_j; Vector vec_k;
@@ -201,13 +221,19 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0, double omega, 
 			di = operator*(cos(theta), vec_i);
 			dj = operator*(sin(theta), vec_j);
 			ML = di.operator+(dj); // laser pointer
+			positionsM.insert(M);
+			positionsM.insert(operator+(M, 50*ML));
 			Ray ray(M, ML);
-			compute_and_add_intersection(mesh, tree, ray, point_set);
+			add_desired_output_to_pcd(mesh, tree, M, ray, point_set, outProperty, x_origin,
+																				  y_origin,
+																				  z_origin);
 		} else {
 			// do nothing
 		}
 		t += dt; // update time
 	}
+	std::ofstream ofM("output_data/positionsM.ply");
+	CGAL::write_ply_point_set(ofM,positionsM);
 	std::cout << "Done with Aerial LiDAR acquisition" << std::endl << std::endl;
 	return point_set;
 }
@@ -276,7 +302,53 @@ Mesh read_input_file(const char* fileName){
 	return mesh;
 }
 
-void Strasbourg_Scene_Raytracing(int nTheta, int nPhi){
+Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi, int outProperty){
+	/*
+		usage:
+			Shoot rays in all directions from a fixed position in space
+			and compute intersections with a mesh
+		input:
+			Mesh mesh: mesh to be raycasted/sampled
+			Point origin: The position from which the rays must be shooted
+			int nTheta: nb of polar angles in [0,pi] interval to generate
+			int nPhi: nb of azimuthal angles in [0,2pi] interval to generate
+			int outProperty: desired property of output point set:
+						 	 	- 0: vertex position ONLY
+						 	 	- 1: vertex + NORMAL
+						 	 	- 2: vertex + OPTICAL CENTER
+		output:
+			Point_set point_set: intersections of the rays with the mesh
+
+	*/
+	std::cout << "Spherical Ray Shooting from position (" << origin << ")" << std::endl;
+
+	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
+
+	// Point Set initialization :
+	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
+	Point_set point_set = initialize_point_set(outProperty, x_origin, y_origin, z_origin);
+
+	double thetaMin=0; double thetaMax=M_PI; // polar angle theta in [0,pi]
+	double phiMin=0; double phiMax=2*M_PI; // azimuthal angle phi in [0,2pi]
+	for (int kTheta=0; kTheta<nTheta; kTheta++){
+		double theta = angle(kTheta, thetaMin, thetaMax, nTheta);
+		for (int kPhi=0; kPhi<nPhi; kPhi++){
+			double phi = angle(kPhi, phiMin, phiMax, nPhi);
+			double x = sin(theta) * cos(phi);
+			double y = sin(theta) * sin(phi);
+			double z = cos(theta);
+			Vector dir = Vector(x,y,z);
+			Ray ray(origin, dir); // ray shooted
+			add_desired_output_to_pcd(mesh, tree, origin, ray, point_set, outProperty, x_origin,
+																					   y_origin,
+																					   z_origin);
+		}
+	}
+	std::cout << "Done with Spherical Ray Shooting" << std::endl << std::endl;
+	return point_set;
+}
+
+void Strasbourg_Scene_Raytracing(int nTheta, int nPhi, int outProperty){
 	/*
 		Routine to raytrace the model PC3E45_3.obj from central position in x/y
 		and z = 3*bbox (above the model) and write the results to a ply pcd
@@ -289,13 +361,13 @@ void Strasbourg_Scene_Raytracing(int nTheta, int nPhi){
 	double y_origin = ( bbox.ymin() + bbox.ymax() ) / 2;
 	double z_origin = bbox.zmin() + 3*( bbox.zmax() - bbox.zmin() );
 	Point origin_lidar(x_origin, y_origin, z_origin);
-	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi);
+	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi, outProperty);
 	std::ofstream of("output_data/out_pcd_normal_PC3E45_3.ply");
 	CGAL::write_ply_point_set(of,point_set);
 	std::cerr << "wrote output_data/out_pcd_normal_PC3E45_3.ply" << std::endl;
 }
 
-void Strasbourg_Scene_Aerial_Lidar(double v0, double omega, double theta_0, double freq){
+void Strasbourg_Scene_Aerial_Lidar(double v0, double omega, double theta_0, double freq, int outProperty){
 	/*
 		Routine to simulate aerial LiDAR on the model PC3E45_3.obj from central 
 		position in x, min and max y and z = 3*bbox (above the model) and write
@@ -307,15 +379,15 @@ void Strasbourg_Scene_Aerial_Lidar(double v0, double omega, double theta_0, doub
 	double x_mid = ( bbox.xmin() + bbox.xmax() ) / 2;
 	double y_A = bbox.ymin();
 	double y_B =  bbox.ymax();
-	double z_above = bbox.zmin() + 3*( bbox.zmax() - bbox.zmin() );
+	double z_above = bbox.zmin() + 300*( bbox.zmax() - bbox.zmin() );
 
 	Point A(x_mid, y_A, z_above);
 	Point B(x_mid, y_B, z_above);
 
-	Point_set point_set = aerial_lidar(mesh, A, B, v0, omega, theta_0, freq);
-	std::ofstream of("output_data/out_pcd_normal_AERIAL_PC3E45_3.ply");
+	Point_set point_set = aerial_lidar(mesh, A, B, v0, omega, theta_0, freq, outProperty);
+	std::ofstream of("output_data/out_origin.ply");
 	CGAL::write_ply_point_set(of,point_set);
-	std::cerr << "wrote output_data/out_pcd_normal_AERIAL_PC3E45_3.ply" << std::endl;
+	std::cerr << "wrote output_data/out_origin.ply" << std::endl;
 }
 
 void object_raytracing_from_centroid(const char* filename, int nTheta, int nPhi){
@@ -325,13 +397,42 @@ void object_raytracing_from_centroid(const char* filename, int nTheta, int nPhi)
 	*/
 	Mesh mesh = read_input_file(filename);
 	Point origin_lidar(centroid(mesh));
-	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi);
-	std::ofstream of("output_data/out_pcd_normal_00.off");
+	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi, 0);
+	std::ofstream of("output_data/out_pcd_normal_00AA.off");
 	CGAL::write_off_point_set(of,point_set);
-	std::cerr << "wrote output_data/out_pcd_normal_00.off" << std::endl;
+	std::cerr << "wrote output_data/out_pcd_normal_00AA.off" << std::endl;
 
 	// just change the name of the file and user this function for a PLY pcd :
 	// CGAL::write_ply_point_set(ofPLY,point_set);
+}
+
+void test(){
+	Point_set point_set;
+	point_set.insert(Point(1,2,3));
+	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
+	bool success = false;
+	Point_origin_map P_origin;
+	boost::tie (x_origin, success) = point_set.add_property_map<double>("x_origin", 0);
+	boost::tie (y_origin, success) = point_set.add_property_map<double>("y_origin", 0);
+	boost::tie (z_origin, success) = point_set.add_property_map<double>("z_origin", 0);
+	// boost::tie (P_origin, success) = point_set.add_property_map<Point>("P_origin", Point(4,12,28));
+	assert(success);
+	std::cout << success << std::endl;
+	point_set.insert(Point(2,7,0));
+
+	Point A(2,7,0);
+	Point_set::iterator it = point_set.insert(A);
+	x_origin[*it] = 270;
+
+	for (int i=0; i<point_set.properties().size(); i++){
+		std::cout << "property " << i <<" : " << point_set.properties()[i] << std::endl;
+	}
+
+	// Point_set ps = initialize_point_set(0, )
+	
+
+	std::ofstream of("output_data/void.ply");
+	CGAL::write_ply_point_set(of,point_set);
 }
 
 int main(int argc, char* argv[])
@@ -339,12 +440,17 @@ int main(int argc, char* argv[])
   const char* filename = (argc > 1) ? argv[1] : "input_data/light/cube.obj"; 
   // object_raytracing_from_centroid(filename, 150, 300);
 
-  // Strasbourg_Scene_Raytracing(150, 300);
+  
   double v0 = 50;
-  double omega = 200*M_PI;
+  double omega = 400*M_PI;
   double freq = 300000;
   double theta_0 = 0;
-  Strasbourg_Scene_Aerial_Lidar(v0, omega, theta_0, freq);
+  int outProperty = 1;
+  // Strasbourg_Scene_Aerial_Lidar(v0, omega, theta_0, freq, outProperty);
+
+  Strasbourg_Scene_Raytracing(150, 300, outProperty);
+
+  // test();
 
   std::cerr << "done" << std::endl;
   return 0;

@@ -18,6 +18,7 @@ CMakeLists.txt
 CMakeCache.txt
 Makefile
 cmake_install.cmake
+CMakeLists.txt.bak
 
 # emacs autosave files :
 \#*#
