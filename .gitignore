@@ -12,6 +12,7 @@ output_data/*
 
 # executables :
 raytracing
+evaluation
 
 # cmake-related :
 CMakeLists.txt

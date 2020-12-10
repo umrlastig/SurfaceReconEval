@@ -20,6 +20,7 @@
 #include <CGAL/IO/OBJ_reader.h>
 #include <CGAL/IO/read_ply_points.h>
 #include <CGAL/boost/graph/io.h>
+#include <CGAL/boost/graph/iterator.h>
 #include <CGAL/tags.h>
 typedef CGAL::Simple_cartesian<double> K;
 typedef K::FT FT;
@@ -29,6 +30,7 @@ typedef K::Ray_3 Ray;
 typedef CGAL::Surface_mesh<Point> Mesh;
 typedef boost::graph_traits<Mesh>::face_descriptor face_descriptor;
 typedef boost::graph_traits<Mesh>::halfedge_descriptor halfedge_descriptor;
+typedef boost::graph_traits<Mesh>::vertex_descriptor vertex_descriptor;
 typedef CGAL::AABB_face_graph_triangle_primitive<Mesh> Primitive;
 typedef CGAL::AABB_traits<K, Primitive> Traits;
 typedef CGAL::AABB_tree<Traits> Tree;
@@ -491,12 +493,73 @@ void test(){
 	// boost::tie (z_origin, success) = pcd.add_property_map<double>("z_origin", 0);
 	// assert(success);
 	is >> pcd;
+	Mesh mesh = read_OBJ_mesh("input_data/light/cube.obj");
 
-	add_normal_noise(pcd, 0, 4);
+	// vertices and faces of mesh already appended to mesh_alpha:
+	std::vector<vertex_descriptor> mAlpha_v;
+	std::vector<Mesh::Face_index> mAlpha_f;
 
-	std::ofstream of("output_data/noisy_pcd.ply");
+	CGAL::Face_around_target_iterator<Mesh> face_b, face_e;
 
-	CGAL::write_ply_point_set(of,pcd);
+	for (vertex_descriptor vd : vertices(mesh)){
+		Point p = mesh.point(vd);
+		std::cout << vd << " : " << p << std::endl;
+
+		//check if p is in mAlpha_v:
+		if (std::find(mAlpha_v.begin(), mAlpha_v.end(), vd) == mAlpha_v.end()){ // if not already in mAlpha_v
+			mAlpha_v.push_back(vd); // ... add it
+		}
+		// browse all faces incident to vertex vd:
+		for (boost::tie( face_b, face_e) = CGAL::faces_around_target(mesh.halfedge(vd),mesh);
+		face_b != face_e;
+		++face_b)
+		{
+			std::cout << " : " << *face_b << std::endl;
+
+			// check if face_b is in mAlpha_f:
+			if (std::find(mAlpha_f.begin(), mAlpha_f.end(), *face_b) == mAlpha_f.end()){ // if not already in mAlpha_f
+				mAlpha_f.push_back(*face_b); // ... add it
+
+				// browse all vertices adjacent to the face face_b:
+				CGAL::Vertex_around_face_iterator<Mesh> vb,ve;
+				for (boost::tie(vb,ve)=CGAL::vertices_around_face(mesh.halfedge(*face_b),mesh);
+				vb != ve;
+				++vb)
+				{
+					std::cout << *vb << " ";
+					// check if vertex *vb is in mAlpha_v:
+					if (std::find(mAlpha_v.begin(), mAlpha_v.end(), *vb) == mAlpha_v.end()){ // if not already in mAlpha_v
+						mAlpha_v.push_back(*vb); // ... add it
+						// add vertex *vb to mesh alpha
+					}
+				}
+				// Now, we are sure every vertices of *face_b are in mesh alpha
+				// so we can add *face_b to M_alpha
+			}
+
+			
+
+
+		}
+
+	}
+	std::cout << std::endl;
+	// display added vertices:
+	for (std::vector<vertex_descriptor>::const_iterator iii=mAlpha_v.begin(); iii != mAlpha_v.end(); ++iii){
+		std::cout << *iii << " - ";
+	}
+	std::cout << std::endl;
+	// display added faces:
+	for (std::vector<Mesh::Face_index>::const_iterator iii=mAlpha_f.begin(); iii != mAlpha_f.end(); ++iii){
+		std::cout << *iii << " - ";
+	}
+
+
+
+
+	// std::ofstream of("output_data/noisy_pcd.ply");
+
+	// CGAL::write_ply_point_set(of,pcd);
 
 }
 
@@ -506,11 +569,11 @@ int main(int argc, char* argv[])
   // object_raytracing_from_centroid(filename, 150, 300);
 
   
-  double v0 = 50;
-  double omega = 200*M_PI;
-  double freq = 300000;
-  double theta_0 = 0;
-  int outProperty = 2;
+  // double v0 = 50;
+  // double omega = 200*M_PI;
+  // double freq = 300000;
+  // double theta_0 = 0;
+  // int outProperty = 2;
   	/*
  	- 0: vertex position ONLY
 	- 1: vertex + NORMAL
@@ -520,7 +583,7 @@ int main(int argc, char* argv[])
 
   // Strasbourg_Scene_Raytracing(150, 300, outProperty);
 
-  // test();
+  test();
 
   std::cerr << "done" << std::endl;
   return 0;
