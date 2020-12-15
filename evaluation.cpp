@@ -1,9 +1,13 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <map>
 #include <math.h>
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh_shortest_path.h>
+#include <CGAL/AABB_tree.h>
+#include <CGAL/AABB_face_graph_triangle_primitive.h>
+#include <CGAL/AABB_traits.h>
 
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Point_set_3.h>
@@ -15,6 +19,7 @@
 
 #include <CGAL/Polygon_mesh_processing/orientation.h>
 #include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
+#include <CGAL/Polygon_mesh_processing/repair.h>
 
 // kernel
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -28,10 +33,16 @@ typedef CGAL::Point_set_3<Point> Point_set;
 typedef CGAL::Surface_mesh_shortest_path_traits<K, Mesh> Traits;
 typedef CGAL::Surface_mesh_shortest_path<Traits> Surface_mesh_shortest_path;
 
-// iterators
+// iterators and descriptors
 typedef boost::graph_traits<Mesh>::face_descriptor face_descriptor;
 typedef boost::graph_traits<Mesh>::halfedge_descriptor halfedge_descriptor;
 typedef boost::graph_traits<Mesh>::vertex_descriptor vertex_descriptor;
+
+// accelerating data structure
+typedef CGAL::AABB_face_graph_triangle_primitive<Mesh> Primitive;
+typedef CGAL::AABB_traits<K, Primitive> Tree_traits;
+typedef CGAL::AABB_tree<Tree_traits> Tree;
+
 
 
 Mesh read_OBJ_mesh(const char* fileName){
@@ -48,6 +59,7 @@ Mesh read_OBJ_mesh(const char* fileName){
 	std::cout << "number of polygons: " << polygons.size() << std::endl;
 
 	// Processing polygon soup:
+	// CGAL::Polygon_mesh_processing::repair_polygon_soup 	(
 	if (!CGAL::Polygon_mesh_processing::is_polygon_soup_a_polygon_mesh(polygons))
 	{
 		// polygons do not define a valid mesh
@@ -74,109 +86,150 @@ Mesh read_OBJ_mesh(const char* fileName){
 	return mesh;
 }
 
-void test(){
+Surface_mesh_shortest_path build_shortest_path(Mesh &mesh, Point_set &pcd){
+	std::cout << "---> Building Shortest Path Sequence Tree" << std::endl;
+	Surface_mesh_shortest_path shortest_paths(mesh);
+	// Tree tree(faces(mesh).first, faces(mesh).second, mesh); // AABB_tree of the mesh
+	Tree tree;
+	shortest_paths.build_aabb_tree(tree); // Creates an AABB_tree suitable for use with locate
+	// browse point set:
+	for (Point_set::const_iterator pi = pcd.begin(); pi != pcd.end(); ++pi){
+		// add point *pi to source:
+		shortest_paths.add_source_point( shortest_paths.locate(pcd.point(*pi), tree) );
+	}
+	std::cout << "Number of source points: " << shortest_paths.number_of_source_points() << std::endl;
+	shortest_paths.build_sequence_tree();
+	std::cout << "Done with building sequence tree" << std::endl;
+	return shortest_paths;
+}
 
-	std::ifstream is ("output_data/out_origin.ply");
-	Point_set pcd;
-	// X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
-	// bool success = false;
-	// boost::tie (x_origin, success) = pcd.add_property_map<double>("x_origin", 0);
-	// boost::tie (y_origin, success) = pcd.add_property_map<double>("y_origin", 0);
-	// boost::tie (z_origin, success) = pcd.add_property_map<double>("z_origin", 0);
-	// assert(success);
-	is >> pcd;
-	Mesh mesh = read_OBJ_mesh("input_data/light/cube.obj");
+std::array<vertex_descriptor, 3> face_alpha(std::map<vertex_descriptor, vertex_descriptor> &mapRefAlpha,
+											std::array<vertex_descriptor, 3> &face_ref)
+{
+	/*
+		usage:
+			- get the correspondance between vertex descriptors of two meshes
+			  where one mesh is a sub-mesh of the other one.
+		input:
+			- mapRefAlpha: the map correspondance of vertex descriptors:
+				o key: vertex descriptor of vertex in mesh_ref
+				o value: vertex descriptor of vertex in sub-mesh mesh_alpha
+			- face_ref: array of 3 vertex descriptors defining a face in
+			  mesh_ref
+		output:
+			- face_a: array of corresponding 3 vertex descriptors defining
+			  the same face but in sub-mesh mesh_alpha
+	*/
+	std::map<vertex_descriptor, vertex_descriptor>::iterator it_ref;
+	std::array<vertex_descriptor, 3> face_a;
+	for (int i=0; i != 3; i++){
+		vertex_descriptor v_ref = face_ref[i];
+		vertex_descriptor v_alpha = mapRefAlpha[v_ref];
+		face_a[i] = v_alpha;
+	}
+	return face_a;
+}
+
+Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha){
+	Mesh mesh_alpha;
 
 	// vertices and faces of mesh already appended to mesh_alpha:
 	std::vector<vertex_descriptor> mAlpha_v;
 	std::vector<Mesh::Face_index> mAlpha_f;
 
-	Surface_mesh_shortest_path shortest_paths(mesh);
-	// write a for loop which browse Point Cloud pcd
-	// for each point, compute its face and barycentric coordinates
-	// using Surface_mesh_shortest_path::locate() (see doc to avoid
-	// rebuilding the tree each time). By the way it is probably
-	// useful to write a function which takes as input pcd and mesh
-	// and returns the set of pairs (face, barycentric coord) for
-	// each point. It does that once for all (so that we don't have
-	// to recompute everything after changing lambda).
+	// correspondance map between vertex indices of mesh and mesh_alpha:
+	// Vertex_map_meshes mapRefAlpha;
+	std::map<vertex_descriptor, vertex_descriptor> mapRefAlpha;
+
+	Surface_mesh_shortest_path shortest_paths = build_shortest_path(mesh, pcd);
 
 	CGAL::Face_around_target_iterator<Mesh> face_b, face_e;
 
 	for (vertex_descriptor vd : vertices(mesh)){
 		Point p = mesh.point(vd);
-		std::cout << std::endl << vd << " : " << p << std::endl;
+		// std::cout << std::endl << vd << " : " << p << std::endl;
 
 		// calculate face and barycentric coordinate of vd
 		// and set as target
+		double d = get<0>(shortest_paths.shortest_distance_to_source_points(vd));
+		// std::cout << "distance to source points: " << d << std::endl;
 
-		//check if p is in mAlpha_v:
-		if (std::find(mAlpha_v.begin(), mAlpha_v.end(), vd) == mAlpha_v.end()){ // if not already in mAlpha_v
-			mAlpha_v.push_back(vd); // ... add it
-		}
-		// browse all faces incident to vertex vd:
-		for (boost::tie( face_b, face_e) = CGAL::faces_around_target(mesh.halfedge(vd),mesh);
-		face_b != face_e;
-		++face_b)
-		{
-			std::cout << " > " << *face_b << std::endl;
-
-			// check if face_b is in mAlpha_f:
-			if (std::find(mAlpha_f.begin(), mAlpha_f.end(), *face_b) == mAlpha_f.end()){ // if not already in mAlpha_f
-				std::cout << "  - ";
-				// browse all vertices adjacent to the face face_b:
-				CGAL::Vertex_around_face_iterator<Mesh> vb,ve;
-				for (boost::tie(vb,ve)=CGAL::vertices_around_face(mesh.halfedge(*face_b),mesh);
-				vb != ve;
-				++vb)
+		if (d < alpha && d >= 0){
+		// if (d < alpha){
+			// browse all faces incident to vertex vd:
+			for (boost::tie(face_b, face_e) = CGAL::faces_around_target(mesh.halfedge(vd),mesh);
+			face_b != face_e;
+			++face_b)
+			{
+				if (face_b->is_valid()) // faces_around_target returns invalid faces for border vertices
 				{
-					std::cout << *vb << " ";
-					// check if vertex *vb is in mAlpha_v:
-					if (std::find(mAlpha_v.begin(), mAlpha_v.end(), *vb) == mAlpha_v.end()){ // if not already in mAlpha_v
-						mAlpha_v.push_back(*vb); // ... add it
-						// add vertex *vb to mesh alpha
+					// std::cout << " > " << *face_b << std::endl;
+					// check if face_b is in mAlpha_f:
+					if (std::find(mAlpha_f.begin(), mAlpha_f.end(), *face_b) == mAlpha_f.end()){
+						// not already in mAlpha_f
+						std::array<vertex_descriptor, 3> face_ref; // to store indices of face in mesh_ref
+						int i = 0;
+						// std::cout << "  - ";
+						// browse all vertices adjacent to the face face_b:
+						CGAL::Vertex_around_face_iterator<Mesh> vb,ve;
+						for (boost::tie(vb,ve)=CGAL::vertices_around_face(mesh.halfedge(*face_b),mesh);
+						vb != ve;
+						++vb)
+						{
+							// std::cout << *vb << " ";
+							// add vertex *vb to current face:
+							face_ref[i] = *vb; i++;
+
+							// check if vertex *vb is in mAlpha_v:
+							if (std::find(mAlpha_v.begin(), mAlpha_v.end(), *vb) == mAlpha_v.end()){ // if not already in mAlpha_v
+								mAlpha_v.push_back(*vb); // ... add it
+
+								// add vertex *vb to mesh alpha:
+								vertex_descriptor vb_alpha = mesh_alpha.add_vertex(mesh.point(*vb));
+
+								// update map:
+								mapRefAlpha.insert( std::pair<vertex_descriptor, vertex_descriptor>(*vb, vb_alpha) );
+							}
+						}
+						// std::cout << std::endl;
+						mAlpha_f.push_back(*face_b); // ... add face
+						// Now, we are sure every vertices of *face_b are in mesh alpha
+						// so we can add *face_b to M_alpha
+						std::array<vertex_descriptor, 3> face_a = face_alpha(mapRefAlpha, face_ref);
+						mesh_alpha.add_face(face_a);
 					}
 				}
-				std::cout << std::endl;
-				mAlpha_f.push_back(*face_b); // ... add face
-				// Now, we are sure every vertices of *face_b are in mesh alpha
-				// so we can add *face_b to M_alpha
 			}
-
-			
-
-
 		}
-
 	}
-	std::cout << std::endl;
-	// display added vertices:
-	for (std::vector<vertex_descriptor>::const_iterator iii=mAlpha_v.begin(); iii != mAlpha_v.end(); ++iii){
-		std::cout << *iii << " - ";
-	}
-	std::cout << std::endl;
-	// display added faces:
-	for (std::vector<Mesh::Face_index>::const_iterator iii=mAlpha_f.begin(); iii != mAlpha_f.end(); ++iii){
-		std::cout << *iii << " - ";
-	}
-	std::cout << std::endl;
-
-
-
-
-	// std::ofstream of("output_data/noisy_pcd.ply");
-
-	// CGAL::write_ply_point_set(of,pcd);
-
+	return mesh_alpha;
 }
-
 
 
 int main(int argc, char** argv)
 {
+	std::cout << "program started" << std::endl << std::endl;
 
-	test();
+	// Mesh mesh;
+	// std::ifstream is ("input_data/light/custom_mesh.off");
+	// Mesh mesh; is >> mesh;
+	Mesh mesh = read_OBJ_mesh("input_data/heavy/open_data_strasbourg/PC3E45/PC3E45_3.obj");
 
-	std::cout << "done" << std::endl;
+	std::cout << "test validity: " << mesh.is_valid(true) << std::endl;
+	std::cout << "test whether it is closed: " << CGAL::is_closed(mesh) << std::endl;
+
+	Point_set pcd;
+	std::ifstream is_pcd ("output_data/out_origin_street.ply");
+	CGAL::read_ply_point_set(is_pcd, pcd);
+
+	int nbRmVert = CGAL::Polygon_mesh_processing::remove_isolated_vertices(mesh);
+	std::cout << nbRmVert << " isolated vertices removed" << std::endl;
+
+	Mesh mesh_alpha = Mesh_alpha(mesh, pcd, 2);
+
+	std::ofstream of("output_data/mesh_alpha_street.off");
+	write_off(of,mesh_alpha);
+
+	std::cout << "program ended" << std::endl;
 	return 0;
 }

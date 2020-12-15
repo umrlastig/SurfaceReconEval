@@ -22,27 +22,35 @@
 #include <CGAL/boost/graph/io.h>
 #include <CGAL/boost/graph/iterator.h>
 #include <CGAL/tags.h>
+
+// kernel
 typedef CGAL::Simple_cartesian<double> K;
 typedef K::FT FT;
+
+// geometrical objects
 typedef K::Point_3 Point;
 typedef K::Vector_3 Vector;
 typedef K::Ray_3 Ray;
 typedef CGAL::Surface_mesh<Point> Mesh;
+typedef CGAL::Point_set_3<Point> Point_set;
+
+// iterators and descriptors
 typedef boost::graph_traits<Mesh>::face_descriptor face_descriptor;
 typedef boost::graph_traits<Mesh>::halfedge_descriptor halfedge_descriptor;
 typedef boost::graph_traits<Mesh>::vertex_descriptor vertex_descriptor;
+
+// accelerating data structure
 typedef CGAL::AABB_face_graph_triangle_primitive<Mesh> Primitive;
 typedef CGAL::AABB_traits<K, Primitive> Traits;
 typedef CGAL::AABB_tree<Traits> Tree;
-typedef boost::optional<Tree::Intersection_and_primitive_id<Ray>::Type> Ray_intersection;
-typedef CGAL::Point_set_3<Point> Point_set;
-typedef Mesh::Face_range Face_range;
 typedef Tree::Primitive_id Primitive_id;
+typedef boost::optional<Tree::Intersection_and_primitive_id<Ray>::Type> Ray_intersection;
 
-// Optical Centers
+// optical centers
 typedef Point_set::Property_map<double> X_Origin_Map;
 typedef Point_set::Property_map<double> Y_Origin_Map;
 typedef Point_set::Property_map<double> Z_Origin_Map;
+
 
 
 struct Skip {
@@ -110,35 +118,36 @@ void compute_local_frame(Vector &AB, Vector &vec_i, Vector &vec_j, Vector &vec_k
 	std::cout << "vec_j: [" << vec_j << "]" << std::endl;
 }
 
-void compute_and_orient_normals(Point_set &point_set, int &k){
-	std::cout << "---> Point set normal estimation" << std::endl;
-	point_set.add_normal_map();
+// void compute_and_orient_normals(Point_set &point_set, unsigned int k){
+// 	std::cout << "---> Point set normal estimation" << std::endl;
+// 	// point_set.add_normal_map();
 
-	// Estimate normals:
-	CGAL::pca_estimate_normals<CGAL::Sequential_tag>(
-								point_set.begin(),
-								point_set.end(),
-								point_set.point_map(),
-								point_set.normal_map(),
-								k
-								);
+// 	// Estimate normals:
+// 	CGAL::pca_estimate_normals<CGAL::Sequential_tag>(
+// 								point_set,
+// 								k,
+// 								point_set.point_map()
+// 								// point_set.normal_map()
+// 								);
+// 	// CGAL::pca_estimate_normals<CGAL::Sequential_tag>(point_set, k);
 
-	// Try to consistently orient normals:
-	std::cout << " normal orientation" << std::endl;
-	Point_set::iterator unoriented_points_begin = CGAL::mst_orient_normals(
-														point_set.begin(),
-														point_set.end(),
-														point_set.point_map(),
-														point_set.normal_map(),
-														k
-														);
+// 	// Try to consistently orient normals:
+// 	std::cout << " normal orientation" << std::endl;
+// 	// Point_set::iterator unoriented_points_begin = CGAL::mst_orient_normals(
+// 	// 													point_set.begin(),
+// 	// 													point_set.end(),
+// 	// 													point_set.point_map(),
+// 	// 													point_set.normal_map(),
+// 	// 													k
+// 	// 													);
+// 	// Point_set::iterator unoriented_points_begin = CGAL::mst_orient_normals(point_set, k);
 
-	// Remove points which orientation failed:
-	int nbRmPoints = point_set.end()-unoriented_points_begin;
-	point_set.remove(unoriented_points_begin, point_set.end());
-	std::cout << " Done with point set normal estimation and orientation: "
-				<< nbRmPoints << " points removed" << std::endl << std::endl;
-}
+// 	// // Remove points which orientation failed:
+// 	// int nbRmPoints = point_set.end()-unoriented_points_begin;
+// 	// point_set.remove(unoriented_points_begin, point_set.end());
+// 	// std::cout << " Done with point set normal estimation and orientation: "
+// 	// 			<< nbRmPoints << " points removed" << std::endl << std::endl;
+// }
 
 Point_set initialize_point_set(int &outProperty, X_Origin_Map &x_origin,
 												 Y_Origin_Map &y_origin,
@@ -419,13 +428,16 @@ void Strasbourg_Scene_Aerial_Lidar(double v0, double omega, double theta_0, doub
 	// double z_above = bbox.zmin() + 100*( bbox.zmax() - bbox.zmin() );
 	double z_above = 1000;
 
-	Point A(x_mid, y_A, z_above);
-	Point B(x_mid, y_B, z_above);
+	// Point A(x_mid, y_A, z_above);
+	// Point B(x_mid, y_B, z_above);
+
+	Point A(14174.3, 20500.2, 147);
+	Point B(14148.6, 20658.6, 147);
 
 	Point_set point_set = aerial_lidar(mesh, A, B, v0, omega, theta_0, freq, outProperty);
-	std::ofstream of("output_data/out_origin.ply");
+	std::ofstream of("output_data/out_origin_street.ply");
 	CGAL::write_ply_point_set(of,point_set);
-	std::cerr << "wrote output_data/out_origin.ply" << std::endl;
+	std::cerr << "wrote output_data/out_origin_street.ply" << std::endl;
 }
 
 void object_raytracing_from_centroid(const char* filename, int nTheta, int nPhi){
@@ -482,109 +494,25 @@ void add_normal_noise(Point_set &pcd, double mu, double sigma){
 	}
 }
 
-void test(){
-
-	std::ifstream is ("output_data/out_origin.ply");
-	Point_set pcd;
-	// X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
-	// bool success = false;
-	// boost::tie (x_origin, success) = pcd.add_property_map<double>("x_origin", 0);
-	// boost::tie (y_origin, success) = pcd.add_property_map<double>("y_origin", 0);
-	// boost::tie (z_origin, success) = pcd.add_property_map<double>("z_origin", 0);
-	// assert(success);
-	is >> pcd;
-	Mesh mesh = read_OBJ_mesh("input_data/light/cube.obj");
-
-	// vertices and faces of mesh already appended to mesh_alpha:
-	std::vector<vertex_descriptor> mAlpha_v;
-	std::vector<Mesh::Face_index> mAlpha_f;
-
-	CGAL::Face_around_target_iterator<Mesh> face_b, face_e;
-
-	for (vertex_descriptor vd : vertices(mesh)){
-		Point p = mesh.point(vd);
-		std::cout << vd << " : " << p << std::endl;
-
-		//check if p is in mAlpha_v:
-		if (std::find(mAlpha_v.begin(), mAlpha_v.end(), vd) == mAlpha_v.end()){ // if not already in mAlpha_v
-			mAlpha_v.push_back(vd); // ... add it
-		}
-		// browse all faces incident to vertex vd:
-		for (boost::tie( face_b, face_e) = CGAL::faces_around_target(mesh.halfedge(vd),mesh);
-		face_b != face_e;
-		++face_b)
-		{
-			std::cout << " : " << *face_b << std::endl;
-
-			// check if face_b is in mAlpha_f:
-			if (std::find(mAlpha_f.begin(), mAlpha_f.end(), *face_b) == mAlpha_f.end()){ // if not already in mAlpha_f
-				mAlpha_f.push_back(*face_b); // ... add it
-
-				// browse all vertices adjacent to the face face_b:
-				CGAL::Vertex_around_face_iterator<Mesh> vb,ve;
-				for (boost::tie(vb,ve)=CGAL::vertices_around_face(mesh.halfedge(*face_b),mesh);
-				vb != ve;
-				++vb)
-				{
-					std::cout << *vb << " ";
-					// check if vertex *vb is in mAlpha_v:
-					if (std::find(mAlpha_v.begin(), mAlpha_v.end(), *vb) == mAlpha_v.end()){ // if not already in mAlpha_v
-						mAlpha_v.push_back(*vb); // ... add it
-						// add vertex *vb to mesh alpha
-					}
-				}
-				// Now, we are sure every vertices of *face_b are in mesh alpha
-				// so we can add *face_b to M_alpha
-			}
-
-			
-
-
-		}
-
-	}
-	std::cout << std::endl;
-	// display added vertices:
-	for (std::vector<vertex_descriptor>::const_iterator iii=mAlpha_v.begin(); iii != mAlpha_v.end(); ++iii){
-		std::cout << *iii << " - ";
-	}
-	std::cout << std::endl;
-	// display added faces:
-	for (std::vector<Mesh::Face_index>::const_iterator iii=mAlpha_f.begin(); iii != mAlpha_f.end(); ++iii){
-		std::cout << *iii << " - ";
-	}
-
-
-
-
-	// std::ofstream of("output_data/noisy_pcd.ply");
-
-	// CGAL::write_ply_point_set(of,pcd);
-
-}
-
 int main(int argc, char* argv[])
 {
+  std::cerr << "program started" << std::endl << std::endl;
   const char* filename = (argc > 1) ? argv[1] : "input_data/light/cube.obj"; 
   // object_raytracing_from_centroid(filename, 150, 300);
 
   
-  // double v0 = 50;
-  // double omega = 200*M_PI;
-  // double freq = 300000;
-  // double theta_0 = 0;
-  // int outProperty = 2;
+  double v0 = 50;
+  double omega = 200*M_PI;
+  double freq = 300000;
+  double theta_0 = 0;
+  int outProperty = 0;
   	/*
  	- 0: vertex position ONLY
 	- 1: vertex + NORMAL
 	- 2: vertex + OPTICAL CENTER
 	*/
-  // Strasbourg_Scene_Aerial_Lidar(v0, omega, theta_0, freq, outProperty);
+  Strasbourg_Scene_Aerial_Lidar(v0, omega, theta_0, freq, outProperty);
 
-  // Strasbourg_Scene_Raytracing(150, 300, outProperty);
-
-  test();
-
-  std::cerr << "done" << std::endl;
+  std::cerr << "program ended" << std::endl;
   return 0;
 }
