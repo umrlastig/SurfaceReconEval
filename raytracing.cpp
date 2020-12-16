@@ -23,6 +23,8 @@
 #include <CGAL/boost/graph/iterator.h>
 #include <CGAL/tags.h>
 
+#include <CGAL/jet_estimate_normals.h>
+
 // kernel
 typedef CGAL::Simple_cartesian<double> K;
 typedef K::FT FT;
@@ -105,7 +107,7 @@ Vector normalize_vector_3(Vector &v){
 }
 
 void compute_local_frame(Vector &AB, Vector &vec_i, Vector &vec_j, Vector &vec_k){
-	std::cout << "Computing local frame" << std::endl;
+	std::cout << " > Computing local frame" << std::endl;
 	vec_k = normalize_vector_3(AB);
 
 	vec_j = CGAL::cross_product(Vector(0,0,1), vec_k);
@@ -113,41 +115,122 @@ void compute_local_frame(Vector &AB, Vector &vec_i, Vector &vec_j, Vector &vec_k
 
 	vec_i = CGAL::cross_product(vec_j, vec_k);
 
-	std::cout << "vec_k: [" << vec_k << "]" << std::endl;
-	std::cout << "vec_i: [" << vec_i << "]" << std::endl;
-	std::cout << "vec_j: [" << vec_j << "]" << std::endl;
+	std::cout << "  vec_k: [" << vec_k << "]" << std::endl;
+	std::cout << "  vec_i: [" << vec_i << "]" << std::endl;
+	std::cout << "  vec_j: [" << vec_j << "]" << std::endl;
 }
 
-// void compute_and_orient_normals(Point_set &point_set, unsigned int k){
-// 	std::cout << "---> Point set normal estimation" << std::endl;
-// 	// point_set.add_normal_map();
+void compute_and_orient_normals(Point_set &pcd, unsigned int k){
+	/*
+		Usage:
+			- compute and orient normals of a point set containing optical centers
+				o normal estimation: PCA-based
+				o normal orientation: based on:
+					Hugues Hoppe, Tony DeRose, Tom Duchamp, John McDonald, and
+					Werner Stuetzle. Surface reconstruction from unorganized
+					points.	In Computer Graphics (Proc. SIGGRAPH '90),
+					volume 26, pages 71–77, 1992.
+		Input:
+			- pcd: input point set containing optical centers
+			- k: number of neighbors for normal computation
+	*/
+	std::cout << "---> Point set normal estimation and orientation" << std::endl;
+	pcd.add_normal_map();
 
-// 	// Estimate normals:
-// 	CGAL::pca_estimate_normals<CGAL::Sequential_tag>(
-// 								point_set,
-// 								k,
-// 								point_set.point_map()
-// 								// point_set.normal_map()
-// 								);
-// 	// CGAL::pca_estimate_normals<CGAL::Sequential_tag>(point_set, k);
+	// Estimate normals:
+	std::cout << " normal estimation" << std::endl;
+	CGAL::pca_estimate_normals<CGAL::Sequential_tag>(
+									pcd,
+									k,
+									CGAL::parameters::
+										point_map (pcd.point_map()).
+										normal_map (pcd.normal_map())
+									);
 
-// 	// Try to consistently orient normals:
-// 	std::cout << " normal orientation" << std::endl;
-// 	// Point_set::iterator unoriented_points_begin = CGAL::mst_orient_normals(
-// 	// 													point_set.begin(),
-// 	// 													point_set.end(),
-// 	// 													point_set.point_map(),
-// 	// 													point_set.normal_map(),
-// 	// 													k
-// 	// 													);
-// 	// Point_set::iterator unoriented_points_begin = CGAL::mst_orient_normals(point_set, k);
+	// Try to consistently orient normals:
+	// CGAL::mst_orient_normals() modifies the order of
+	// input points so as to pack all sucessfully oriented
+	// points first, and returns an iterator over the
+	// first point with an unoriented normal
+	std::cout << " normal orientation" << std::endl;
+	Point_set::iterator unoriented_points_begin = CGAL::mst_orient_normals(
+											pcd,
+											k,
+											CGAL::parameters::
+												point_map (pcd.point_map()).
+												normal_map (pcd.normal_map())
+											);
 
-// 	// // Remove points which orientation failed:
-// 	// int nbRmPoints = point_set.end()-unoriented_points_begin;
-// 	// point_set.remove(unoriented_points_begin, point_set.end());
-// 	// std::cout << " Done with point set normal estimation and orientation: "
-// 	// 			<< nbRmPoints << " points removed" << std::endl << std::endl;
-// }
+	// Remove points which orientation failed:
+	int nbRmPoints = pcd.end()-unoriented_points_begin;
+	pcd.remove(unoriented_points_begin, pcd.end());
+	std::cout << " Done with point set normal estimation and orientation: "
+				<< nbRmPoints << " points removed" << std::endl << std::endl;
+}
+
+Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned int k, bool inside){
+	/*
+		Usage:
+			- compute and orient normals of a point set containing optical centers
+				o normal estimation: PCA-based
+				o normal orientation:
+					> if in:inside = false => normal and vec(PiOi) must have
+											  positive dot product
+					> if in:inside = true => must be negative
+		Input:
+			- pcd: input point set containing optical centers
+			- k: number of neighbors for normal computation
+			- inside: indicates whether or not the optical center is INSIDE
+					  the underlying object of which the point set is a sampling
+		Output:
+			- out_pcd: point set containing the same points as in:pcd but with
+					   oriented normals
+	*/
+	std::cout << "---> Point set normal estimation and orientation" << std::endl;
+	pcd.add_normal_map();
+
+	// Estimate normals:
+	std::cout << " normal estimation" << std::endl;
+	CGAL::pca_estimate_normals<CGAL::Sequential_tag>(
+									pcd,
+									k,
+									CGAL::parameters::
+										point_map (pcd.point_map()).
+										normal_map (pcd.normal_map())
+									);
+
+	// Read optical centers and check validity:
+	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
+	bool success_x = false; bool success_y = false; bool success_z = false;
+	boost::tie(x_origin, success_x) = pcd.property_map<double>("x_origin");
+	boost::tie(y_origin, success_y) = pcd.property_map<double>("y_origin");
+	boost::tie(z_origin, success_z) = pcd.property_map<double>("z_origin");
+	if (!success_x || !success_y || !success_z){
+		std::cout << "ERROR: optical centers absent from in:pcd";
+	}
+
+	// New point set for output with normals but without optical centers:
+	Point_set out_pcd; out_pcd.add_normal_map();
+
+	std::cout << " orientation based on optical centers" << std::endl;
+	for (Point_set::iterator p = pcd.begin(); p != pcd.end(); ++p)
+	{
+		Point Pi = pcd.point(*p);
+		Vector ni = pcd.normal(*p);
+		Point Oi(x_origin[*p], y_origin[*p], z_origin[*p]);
+		Vector PO(Pi,Oi);
+
+		// if optical center was inside the object, change convention:
+		int out = 1; if (inside){out = -1;}
+		if (out * CGAL::scalar_product(ni, PO) < 0) // if normal is mis-oriented
+		{
+			ni.operator*=(-1); // flip normal
+		}
+		out_pcd.insert(Pi, ni);
+	}
+	std::cout << " Done with normal estimation and orientation" << std::endl << std::endl;
+	return out_pcd;
+}
 
 Point_set initialize_point_set(int &outProperty, X_Origin_Map &x_origin,
 												 Y_Origin_Map &y_origin,
@@ -170,14 +253,16 @@ Point_set initialize_point_set(int &outProperty, X_Origin_Map &x_origin,
 
 	} else if (outProperty == 2) {
 		std::cout << "Vertex position + OPTICAL CENTER" << std::endl;
-		bool success = false;
-		boost::tie (x_origin, success) = point_set.add_property_map<double>("x_origin", 0);
-		boost::tie (y_origin, success) = point_set.add_property_map<double>("y_origin", 0);
-		boost::tie (z_origin, success) = point_set.add_property_map<double>("z_origin", 0);
-		assert(success);
+		bool success_x = false; bool success_y = false; bool success_z = false;
+		boost::tie (x_origin, success_x) = point_set.add_property_map<double>("x_origin", 0);
+		boost::tie (y_origin, success_y) = point_set.add_property_map<double>("y_origin", 0);
+		boost::tie (z_origin, success_z) = point_set.add_property_map<double>("z_origin", 0);
+		if (!success_x || !success_y || !success_z){
+			std::cout << "ERROR: impossible to add optical center properties";
+		}
 	} else {
-		std::cerr << "Error: 'outProperty' argument not valid. Must be 0, 1 or 2" << std::endl;
-		std::cerr << "'outProperty' changed to 0 value" << std::endl;
+		std::cerr << "ERROR: 'outProperty' argument not valid. Must be 0, 1 or 2" << std::endl;
+		std::cerr << " 'outProperty' changed to 0 value" << std::endl;
 		outProperty = 0;
 	}
 	return point_set;
@@ -280,7 +365,7 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0, double omega, 
 	}
 	std::ofstream ofM("output_data/positionsM.ply");
 	CGAL::write_ply_point_set(ofM,positionsM);
-	std::cout << "Done with Aerial LiDAR acquisition" << std::endl << std::endl;
+	std::cout << " Done with Aerial LiDAR acquisition" << std::endl << std::endl;
 	return point_set;
 }
 
@@ -302,32 +387,33 @@ Mesh read_OBJ_mesh(const char* fileName){
 
 	// Extract points and polygons from stream 'is':
 	CGAL::read_OBJ(is, points, polygons);	
-	std::cout << "number of points: " << points.size() << std::endl;
-	std::cout << "number of polygons: " << polygons.size() << std::endl;
+	std::cout << " number of points: " << points.size() << std::endl;
+	std::cout << " number of polygons: " << polygons.size() << std::endl;
 
 	// Processing polygon soup:
 	if (!CGAL::Polygon_mesh_processing::is_polygon_soup_a_polygon_mesh(polygons))
 	{
 		// polygons do not define a valid mesh
-		std::cout << "Warning: [" << fileName << "] does not define a valid polygon mesh " << std::endl;
+		std::cout << " Warning: [" << fileName << "] does not define a valid polygon mesh. "
+		<< "Trying to orient..." << std::endl;
 		if ( !CGAL::Polygon_mesh_processing::orient_polygon_soup(points, polygons) ){ // try to orient
 			// orientation failed
-			std::cout << "Warning: the orientation of the polygon soup ["
+			std::cout << "  Warning: the orientation of the polygon soup ["
 			<< fileName << "] failed. => Points were duplicated." << std::endl;
 		} else {
 			// orientation succeeded
-			std::cout << "orientation of the polygon soup [" << fileName << "] was a success." << std::endl;
+			std::cout << "  orientation of the polygon soup [" << fileName << "] was a success." << std::endl;
 		}
 	} else {
 		// polygons define a valid mesh
-		std::cout << "Success: [" << fileName << "] defines a valid polygon mesh " << std::endl;
+		std::cout << " Success: [" << fileName << "] defines a valid polygon mesh " << std::endl;
 	}
 
 	CGAL::Polygon_mesh_processing::polygon_soup_to_polygon_mesh(points, polygons, mesh);
 
-	std::cout << "Number of points: " << mesh.number_of_vertices() << std::endl;
-	std::cout << "Number of faces: " << mesh.number_of_faces() << std::endl;
-	std::cout << "Done with reading" << std::endl << std::endl;
+	std::cout << " Number of points: " << mesh.number_of_vertices() << std::endl;
+	std::cout << " Number of faces: " << mesh.number_of_faces() << std::endl;
+	std::cout << " Done with reading" << std::endl << std::endl;
 
 	return mesh;
 }
@@ -390,7 +476,7 @@ Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi, 
 																					   z_origin);
 		}
 	}
-	std::cout << "Done with Spherical Ray Shooting" << std::endl << std::endl;
+	std::cout << " Done with Spherical Ray Shooting" << std::endl << std::endl;
 	return point_set;
 }
 
@@ -435,9 +521,9 @@ void Strasbourg_Scene_Aerial_Lidar(double v0, double omega, double theta_0, doub
 	Point B(14148.6, 20658.6, 147);
 
 	Point_set point_set = aerial_lidar(mesh, A, B, v0, omega, theta_0, freq, outProperty);
-	std::ofstream of("output_data/out_origin_street.ply");
+	std::ofstream of("output_data/out_origin_street_n.ply");
 	CGAL::write_ply_point_set(of,point_set);
-	std::cerr << "wrote output_data/out_origin_street.ply" << std::endl;
+	std::cerr << "wrote output_data/out_origin_street_n.ply" << std::endl;
 }
 
 void object_raytracing_from_centroid(const char* filename, int nTheta, int nPhi){
@@ -447,10 +533,12 @@ void object_raytracing_from_centroid(const char* filename, int nTheta, int nPhi)
 	*/
 	Mesh mesh = read_input_file(filename);
 	Point origin_lidar(centroid(mesh));
-	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi, 0);
-	std::ofstream of("output_data/out_pcd_normal_00AA.off");
-	CGAL::write_off_point_set(of,point_set);
-	std::cerr << "wrote output_data/out_pcd_normal_00AA.off" << std::endl;
+	int outProperty = 2;
+	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi, outProperty);
+	std::ofstream of("output_data/tetra_oc.ply");
+	// CGAL::write_off_point_set(of,point_set);
+	CGAL::write_ply_point_set(of,point_set);
+	std::cerr << "wrote output_data/tetra_oc.ply" << std::endl;
 
 	// just change the name of the file and user this function for a PLY pcd:
 	// CGAL::write_ply_point_set(ofPLY,point_set);
@@ -474,12 +562,15 @@ void add_normal_noise(Point_set &pcd, double mu, double sigma){
 	std::default_random_engine generator;
 	std::normal_distribution<double> normDistri(mu, sigma);
 
-	// extract property maps:
+	// Read optical centers and check validity:
 	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
-	bool success = false;
-	boost::tie (x_origin, success) = pcd.property_map<FT>("x_origin"); assert(success);
-	boost::tie (y_origin, success) = pcd.property_map<FT>("y_origin"); assert(success);
-	boost::tie (z_origin, success) = pcd.property_map<FT>("z_origin"); assert(success);
+	bool success_x = false; bool success_y = false; bool success_z = false;
+	boost::tie(x_origin, success_x) = pcd.property_map<double>("x_origin");
+	boost::tie(y_origin, success_y) = pcd.property_map<double>("y_origin");
+	boost::tie(z_origin, success_z) = pcd.property_map<double>("z_origin");
+	if (!success_x || !success_y || !success_z){
+		std::cout << "ERROR: optical centers absent from in:pcd";
+	}
 
 	// Browse point set:
 	for (Point_set::const_iterator it = pcd.begin(); it != pcd.end(); it++){
@@ -496,23 +587,35 @@ void add_normal_noise(Point_set &pcd, double mu, double sigma){
 
 int main(int argc, char* argv[])
 {
-  std::cerr << "program started" << std::endl << std::endl;
-  const char* filename = (argc > 1) ? argv[1] : "input_data/light/cube.obj"; 
-  // object_raytracing_from_centroid(filename, 150, 300);
+	std::cout << "--> program started <--" << std::endl << std::endl;
+	const char* filename = (argc > 1) ? argv[1] : "input_data/light/cube.obj"; 
+	// object_raytracing_from_centroid(filename, 150, 300);
 
   
-  double v0 = 50;
-  double omega = 200*M_PI;
-  double freq = 300000;
-  double theta_0 = 0;
-  int outProperty = 0;
-  	/*
- 	- 0: vertex position ONLY
-	- 1: vertex + NORMAL
-	- 2: vertex + OPTICAL CENTER
+	double v0 = 50;
+	double omega = 200*M_PI;
+	double freq = 300000;
+	double theta_0 = 0;
+	int outProperty = 1;
+	/*
+		- 0: vertex position ONLY
+		- 1: vertex + NORMAL
+		- 2: vertex + OPTICAL CENTER
 	*/
-  Strasbourg_Scene_Aerial_Lidar(v0, omega, theta_0, freq, outProperty);
+	// Strasbourg_Scene_Aerial_Lidar(v0, omega, theta_0, freq, outProperty);
+	// object_raytracing_from_centroid("input_data/light/tetrahedron.off", 5, 10);
 
-  std::cerr << "program ended" << std::endl;
+	Point_set pcd;
+	std::ifstream is_pcd ("output_data/tetra_oc.ply");
+	// std::ifstream is_pcd ("output_data/out_cow.off");
+	is_pcd >> pcd;
+	// compute_and_orient_normals(pcd, 18);
+	bool inside = false;
+	Point_set out_pcd = compute_and_orient_normals_based_on_origin(pcd, 5, inside);
+	std::ofstream of("output_data/tetra_normal.ply");
+	CGAL::write_ply_point_set(of,out_pcd);
+
+
+  std::cout << "--> program ended <--" << std::endl;
   return 0;
 }

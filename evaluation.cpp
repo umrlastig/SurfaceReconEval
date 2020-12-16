@@ -14,6 +14,7 @@
 #include <CGAL/Point_set_3/IO.h>
 #include <CGAL/IO/OBJ_reader.h>
 #include <CGAL/IO/read_ply_points.h>
+#include <CGAL/IO/read_off_points.h>
 #include <CGAL/boost/graph/io.h>
 #include <CGAL/boost/graph/iterator.h>
 
@@ -54,7 +55,7 @@ Mesh read_OBJ_mesh(const char* fileName){
 	std::vector<std::vector<std::size_t>> polygons;
 
 	// Extract points and polygons from stream 'is':
-	CGAL::read_OBJ(is, points, polygons);	
+	CGAL::read_OBJ(is, points, polygons);
 	std::cout << "number of points: " << points.size() << std::endl;
 	std::cout << "number of polygons: " << polygons.size() << std::endl;
 
@@ -97,9 +98,9 @@ Surface_mesh_shortest_path build_shortest_path(Mesh &mesh, Point_set &pcd){
 		// add point *pi to source:
 		shortest_paths.add_source_point( shortest_paths.locate(pcd.point(*pi), tree) );
 	}
-	std::cout << "Number of source points: " << shortest_paths.number_of_source_points() << std::endl;
+	std::cout << " Number of source points: " << shortest_paths.number_of_source_points() << std::endl;
 	shortest_paths.build_sequence_tree();
-	std::cout << "Done with building sequence tree" << std::endl;
+	std::cout << " Done with building sequence tree" << std::endl;
 	return shortest_paths;
 }
 
@@ -131,6 +132,24 @@ std::array<vertex_descriptor, 3> face_alpha(std::map<vertex_descriptor, vertex_d
 }
 
 Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha){
+	/*
+		usage:
+			- compute the "reconstructible" part of a mesh based on a
+			  partial sampling of it: the set of triangles for which
+			  at least one vertex is closer than a given geodesic
+			  distance from at least one sample point.
+		input:
+			- mesh: the full mesh that has been sampled
+			- pcd: the point cloud representing a sampling of in:mesh
+			- alpha: the geodesic distance above which a triangle is
+			  not appended to out:mesh_alpha
+		output:
+			- mesh_alpha: the subset of in:mesh for which triangles are
+			  closer than in:alpha to in:pcd
+	*/
+	std::cout << "---> Computing mesh_alpha (reconstructible part of mesh)"
+			  << std::endl;
+	std::cout << "  max geodesic distance: " << alpha << std::endl;
 	Mesh mesh_alpha;
 
 	// vertices and faces of mesh already appended to mesh_alpha:
@@ -202,34 +221,40 @@ Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha){
 			}
 		}
 	}
+	std::cout << " Done with mesh_alpha computation" << std::endl << std::endl;
 	return mesh_alpha;
 }
 
 
 int main(int argc, char** argv)
 {
-	std::cout << "program started" << std::endl << std::endl;
+	std::cout << "--> program started <--" << std::endl << std::endl;
 
 	// Mesh mesh;
 	// std::ifstream is ("input_data/light/custom_mesh.off");
 	// Mesh mesh; is >> mesh;
-	Mesh mesh = read_OBJ_mesh("input_data/heavy/open_data_strasbourg/PC3E45/PC3E45_3.obj");
+	// Mesh mesh = read_OBJ_mesh("input_data/heavy/open_data_strasbourg/PC3E45/PC3E45_3.obj");
+	Mesh mesh = read_OBJ_mesh("input_data/heavy/cow.obj");
 
 	std::cout << "test validity: " << mesh.is_valid(true) << std::endl;
 	std::cout << "test whether it is closed: " << CGAL::is_closed(mesh) << std::endl;
 
 	Point_set pcd;
-	std::ifstream is_pcd ("output_data/out_origin_street.ply");
-	CGAL::read_ply_point_set(is_pcd, pcd);
+	std::ifstream is_pcd ("output_data/out_cow.off");
+	// CGAL::read_ply_point_set(is_pcd, pcd);
+	// bool readSuccess = CGAL::read_off_points(is_pcd, )
+	// CGAL::read_off_points(is_pcd, pcd.index_back_inserter());
+	is_pcd >> pcd;
+
 
 	int nbRmVert = CGAL::Polygon_mesh_processing::remove_isolated_vertices(mesh);
 	std::cout << nbRmVert << " isolated vertices removed" << std::endl;
 
-	Mesh mesh_alpha = Mesh_alpha(mesh, pcd, 2);
+	Mesh mesh_alpha = Mesh_alpha(mesh, pcd, 0.65);
 
-	std::ofstream of("output_data/mesh_alpha_street.off");
+	std::ofstream of("output_data/mesh_alpha_cow.off");
 	write_off(of,mesh_alpha);
 
-	std::cout << "program ended" << std::endl;
+	std::cout << "--> program ended <--" << std::endl;
 	return 0;
 }
