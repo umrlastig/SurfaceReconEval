@@ -142,10 +142,10 @@ Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha){
 			- mesh: the full mesh that has been sampled
 			- pcd: the point cloud representing a sampling of in:mesh
 			- alpha: the geodesic distance above which a triangle is
-			  not appended to out:mesh_alpha
+					 not appended to out:mesh_alpha
 		output:
 			- mesh_alpha: the subset of in:mesh for which triangles are
-			  closer than in:alpha to in:pcd
+						  closer than in:alpha to in:pcd
 	*/
 	std::cout << "---> Computing mesh_alpha (reconstructible part of mesh)"
 			  << std::endl;

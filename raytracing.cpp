@@ -168,20 +168,16 @@ void compute_and_orient_normals(Point_set &pcd, unsigned int k){
 				<< nbRmPoints << " points removed" << std::endl << std::endl;
 }
 
-Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned int k, bool inside){
+Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned int k){
 	/*
 		Usage:
 			- compute and orient normals of a point set containing optical centers
 				o normal estimation: PCA-based
 				o normal orientation:
-					> if in:inside = false => normal and vec(PiOi) must have
-											  positive dot product
-					> if in:inside = true => must be negative
+					normal n_i and vec(PiOi) must have positive dot product
 		Input:
 			- pcd: input point set containing optical centers
 			- k: number of neighbors for normal computation
-			- inside: indicates whether or not the optical center is INSIDE
-					  the underlying object of which the point set is a sampling
 		Output:
 			- out_pcd: point set containing the same points as in:pcd but with
 					   oriented normals
@@ -218,11 +214,9 @@ Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned in
 		Point Pi = pcd.point(*p);
 		Vector ni = pcd.normal(*p);
 		Point Oi(x_origin[*p], y_origin[*p], z_origin[*p]);
-		Vector PO(Pi,Oi);
+		Vector PiOi(Pi,Oi);
 
-		// if optical center was inside the object, change convention:
-		int out = 1; if (inside){out = -1;}
-		if (out * CGAL::scalar_product(ni, PO) < 0) // if normal is mis-oriented
+		if (CGAL::scalar_product(ni, PiOi) < 0) // if normal is mis-oriented
 		{
 			ni.operator*=(-1); // flip normal
 		}
@@ -610,8 +604,7 @@ int main(int argc, char* argv[])
 	// std::ifstream is_pcd ("output_data/out_cow.off");
 	is_pcd >> pcd;
 	// compute_and_orient_normals(pcd, 18);
-	bool inside = false;
-	Point_set out_pcd = compute_and_orient_normals_based_on_origin(pcd, 5, inside);
+	Point_set out_pcd = compute_and_orient_normals_based_on_origin(pcd, 5);
 	std::ofstream of("output_data/tetra_normal.ply");
 	CGAL::write_ply_point_set(of,out_pcd);
 
