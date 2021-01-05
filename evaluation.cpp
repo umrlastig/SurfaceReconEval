@@ -22,6 +22,15 @@
 #include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
 #include <CGAL/Polygon_mesh_processing/repair.h>
 
+// neighbor searching
+#include <CGAL/point_generators_3.h>
+#include <CGAL/Orthogonal_k_neighbor_search.h>
+#include <CGAL/Search_traits_3.h>
+
+#include <list>
+#include <cmath>
+
+
 // kernel
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 
@@ -43,6 +52,11 @@ typedef boost::graph_traits<Mesh>::vertex_descriptor vertex_descriptor;
 typedef CGAL::AABB_face_graph_triangle_primitive<Mesh> Primitive;
 typedef CGAL::AABB_traits<K, Primitive> Tree_traits;
 typedef CGAL::AABB_tree<Tree_traits> Tree;
+
+// neighbor searching
+typedef CGAL::Search_traits_3<K> TreeTraitsNS;
+typedef CGAL::Orthogonal_k_neighbor_search<TreeTraitsNS> Neighbor_search;
+typedef Neighbor_search::Tree TreeNS;
 
 
 
@@ -225,6 +239,91 @@ Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha){
 	return mesh_alpha;
 }
 
+void remove_points_too_far_from_P(Point_set &pcd, Point_set &P, double alpha){
+	/*
+		usage:
+			- Remove points from in:pcd that are farther from P than in:alpha
+		input:
+			- pcd: a point cloud representing a sampling of a surface
+			- P: the input point cloud used for a reconstruction
+			- alpha: the distance above which a point is deleted
+	*/
+
+	std::cout << "Started removing points farther than alpha = " << alpha << " from P" << std::endl;
+
+	TreeNS tree(P.points().begin(), P.points().end());
+	std::vector<Point_set::const_iterator> ptsToRemove;
+
+	for (Point_set::const_iterator pi = pcd.begin(); pi != pcd.end(); ++pi){
+		Point query = pcd.point(*pi);
+		Neighbor_search search(tree, query, 1);
+		Neighbor_search::iterator itS = search.begin(); // only one neighbor
+
+		// to display point and its distance to nearest neighbor:
+		// std::cout << itS->first << " "<< std::sqrt(itS->second) << std::endl;
+
+		double dist = std::sqrt(itS->second);
+		if (dist > alpha)
+		{
+			ptsToRemove.push_back(pi); // store point to remove
+		}
+	}
+
+	// remove all points too far:
+	for (int i = 0; i != ptsToRemove.size(); ++i){
+		pcd.remove(*ptsToRemove[i]);
+	}
+
+	std::cout << "Done: " << ptsToRemove.size() << " point(s) removed" << std::endl;
+}
+
+void test(){
+	std::cout << "starting test" << std::endl;
+
+	Point_set P;
+	P.insert(Point(0.1, 0.1, 0.1));
+	P.insert(Point(0.1, 5, 6));
+	P.insert(Point(0.1, 7, 6));
+	P.insert(Point(0.1, 40, 6));
+	P.insert(Point(0.1, 28, 2));
+
+	Point_set pcd;
+	pcd.insert(Point(0,0,0));
+	pcd.insert(Point(-1,-1,0));
+
+	std::cout << "point cloud: " << std::endl;
+	for (Point_set::const_iterator it = pcd.begin(); it != pcd.end(); ++it){
+		std::cout << pcd.point(*it) << std::endl;
+	}
+	remove_points_too_far_from_P(pcd, P, 1);
+
+	std::cout << "point cloud: " << std::endl;
+	for (Point_set::const_iterator it = pcd.begin(); it != pcd.end(); ++it){
+		std::cout << pcd.point(*it) << std::endl;
+	}
+
+
+
+
+	// std::list<Point> pcd2;
+	// pcd2.push_back(Point(0.1, 0.1, 0.1));
+	// pcd2.push_back(Point(0.1, 5, 6));
+	// pcd2.push_back(Point(0.1, 7, 6));
+	// pcd2.push_back(Point(0.1, 40, 6));
+	// pcd2.push_back(Point(0.1, 28, 2));
+
+	// // std::list<Point> pts = pcd.points();
+	// TreeNS tree(pcd.points().begin(), pcd.points().end());
+	// Point query(0,0,0);
+	// Neighbor_search search(tree, query, 3);
+
+	// for(Neighbor_search::iterator it = search.begin(); it != search.end(); ++it)
+	// {
+	// 	std::cout << it->first << " "<< std::sqrt(it->second) << std::endl;
+	// }
+
+	std::cout << "test ended" << std::endl;
+}
 
 int main(int argc, char** argv)
 {
@@ -234,26 +333,29 @@ int main(int argc, char** argv)
 	// std::ifstream is ("input_data/light/custom_mesh.off");
 	// Mesh mesh; is >> mesh;
 	// Mesh mesh = read_OBJ_mesh("input_data/heavy/open_data_strasbourg/PC3E45/PC3E45_3.obj");
-	Mesh mesh = read_OBJ_mesh("input_data/heavy/cow.obj");
+	// // Mesh mesh = read_OBJ_mesh("input_data/heavy/cow.obj");
 
-	std::cout << "test validity: " << mesh.is_valid(true) << std::endl;
-	std::cout << "test whether it is closed: " << CGAL::is_closed(mesh) << std::endl;
+	// std::cout << "test validity: " << mesh.is_valid(true) << std::endl;
+	// std::cout << "test whether it is closed: " << CGAL::is_closed(mesh) << std::endl;
 
-	Point_set pcd;
-	std::ifstream is_pcd ("output_data/out_cow.off");
-	// CGAL::read_ply_point_set(is_pcd, pcd);
-	// bool readSuccess = CGAL::read_off_points(is_pcd, )
-	// CGAL::read_off_points(is_pcd, pcd.index_back_inserter());
-	is_pcd >> pcd;
+	// Point_set pcd;
+	// // std::ifstream is_pcd ("output_data/out_cow.off");
+	// std::ifstream is_pcd ("output_data/out_origin.ply");
+	// // CGAL::read_ply_point_set(is_pcd, pcd);
+	// // bool readSuccess = CGAL::read_off_points(is_pcd, )
+	// // CGAL::read_off_points(is_pcd, pcd.index_back_inserter());
+	// is_pcd >> pcd;
 
 
-	int nbRmVert = CGAL::Polygon_mesh_processing::remove_isolated_vertices(mesh);
-	std::cout << nbRmVert << " isolated vertices removed" << std::endl;
+	// int nbRmVert = CGAL::Polygon_mesh_processing::remove_isolated_vertices(mesh);
+	// std::cout << nbRmVert << " isolated vertices removed" << std::endl;
 
-	Mesh mesh_alpha = Mesh_alpha(mesh, pcd, 0.65);
+	// Mesh mesh_alpha = Mesh_alpha(mesh, pcd, 1);
 
-	std::ofstream of("output_data/mesh_alpha_cow.off");
-	write_off(of,mesh_alpha);
+	// std::ofstream of("output_data/mesh_alpha_strasbourg.off");
+	// write_off(of,mesh_alpha);
+
+	test();
 
 	std::cout << "--> program ended <--" << std::endl;
 	return 0;

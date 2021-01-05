@@ -596,17 +596,17 @@ int main(int argc, char* argv[])
 		- 1: vertex + NORMAL
 		- 2: vertex + OPTICAL CENTER
 	*/
-	// Strasbourg_Scene_Aerial_Lidar(v0, omega, theta_0, freq, outProperty);
+	Strasbourg_Scene_Aerial_Lidar(v0, omega, theta_0, freq, outProperty);
 	// object_raytracing_from_centroid("input_data/light/tetrahedron.off", 5, 10);
 
-	Point_set pcd;
-	std::ifstream is_pcd ("output_data/tetra_oc.ply");
-	// std::ifstream is_pcd ("output_data/out_cow.off");
-	is_pcd >> pcd;
-	// compute_and_orient_normals(pcd, 18);
-	Point_set out_pcd = compute_and_orient_normals_based_on_origin(pcd, 5);
-	std::ofstream of("output_data/tetra_normal.ply");
-	CGAL::write_ply_point_set(of,out_pcd);
+	// Point_set pcd;
+	// std::ifstream is_pcd ("output_data/tetra_oc.ply");
+	// // std::ifstream is_pcd ("output_data/out_cow.off");
+	// is_pcd >> pcd;
+	// // compute_and_orient_normals(pcd, 18);
+	// Point_set out_pcd = compute_and_orient_normals_based_on_origin(pcd, 5);
+	// std::ofstream of("output_data/tetra_normal.ply");
+	// CGAL::write_ply_point_set(of,out_pcd);
 
 
   std::cout << "--> program ended <--" << std::endl;
