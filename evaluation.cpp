@@ -18,9 +18,11 @@
 #include <CGAL/boost/graph/io.h>
 #include <CGAL/boost/graph/iterator.h>
 
+// Polygon_mesh_processing
 #include <CGAL/Polygon_mesh_processing/orientation.h>
 #include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
 #include <CGAL/Polygon_mesh_processing/repair.h>
+#include <CGAL/Polygon_mesh_processing/distance.h>
 
 // neighbor searching
 #include <CGAL/point_generators_3.h>
@@ -58,6 +60,8 @@ typedef CGAL::Search_traits_3<K> TreeTraitsNS;
 typedef CGAL::Orthogonal_k_neighbor_search<TreeTraitsNS> Neighbor_search;
 typedef Neighbor_search::Tree TreeNS;
 
+namespace PMP = CGAL::Polygon_mesh_processing;
+
 
 
 Mesh read_OBJ_mesh(const char* fileName){
@@ -74,12 +78,12 @@ Mesh read_OBJ_mesh(const char* fileName){
 	std::cout << "number of polygons: " << polygons.size() << std::endl;
 
 	// Processing polygon soup:
-	// CGAL::Polygon_mesh_processing::repair_polygon_soup 	(
-	if (!CGAL::Polygon_mesh_processing::is_polygon_soup_a_polygon_mesh(polygons))
+	// PMP::repair_polygon_soup 	(
+	if (!PMP::is_polygon_soup_a_polygon_mesh(polygons))
 	{
 		// polygons do not define a valid mesh
 		std::cout << "Warning: [" << fileName << "] does not define a valid polygon mesh " << std::endl;
-		if ( !CGAL::Polygon_mesh_processing::orient_polygon_soup(points, polygons) ){ // try to orient
+		if ( !PMP::orient_polygon_soup(points, polygons) ){ // try to orient
 			// orientation failed
 			std::cout << "Warning: the orientation of the polygon soup ["
 			<< fileName << "] failed. => Points were duplicated." << std::endl;
@@ -92,7 +96,7 @@ Mesh read_OBJ_mesh(const char* fileName){
 		std::cout << "Success: [" << fileName << "] defines a valid polygon mesh " << std::endl;
 	}
 
-	CGAL::Polygon_mesh_processing::polygon_soup_to_polygon_mesh(points, polygons, mesh);
+	PMP::polygon_soup_to_polygon_mesh(points, polygons, mesh);
 
 	std::cout << "Number of points: " << mesh.number_of_vertices() << std::endl;
 	std::cout << "Number of faces: " << mesh.number_of_faces() << std::endl;
@@ -277,6 +281,32 @@ void remove_points_too_far_from_P(Point_set &pcd, Point_set &P, double alpha){
 	std::cout << "Done: " << ptsToRemove.size() << " point(s) removed" << std::endl;
 }
 
+double mean_distance_from_P_to_mesh(Point_set &pcd, Mesh &mesh){
+	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
+	double mean_distance = 0;
+	for (Point_set::const_iterator pi = pcd.begin(); pi != pcd.end(); ++pi){
+		Point query = pcd.point(*pi);
+		// Point closest = tree.closest_point(query); // optional
+		double distance = std::sqrt( tree.squared_distance(query) );
+
+		std::cout << "query: " << query << std::endl;
+		// std::cout << "closest: " << closest << std::endl;
+		std::cout << "distance: " << distance << std::endl << std::endl;
+
+		mean_distance += distance;
+	}
+	int nbPts = pcd.end() - pcd.begin();
+	mean_distance /= nbPts;
+	return mean_distance;
+}
+
+void mean_and_max_distance_from_P_to_mesh(Point_set &pcd, Mesh &mesh){
+	double mean = mean_distance_from_P_to_mesh(pcd, mesh);
+	double max = PMP::max_distance_to_triangle_mesh<CGAL::Sequential_tag>(pcd.points(), mesh);
+	std::cout << "mean distance: " << mean << std::endl;
+	std::cout << "max distance: " << max << std::endl;
+}
+
 void test(){
 	std::cout << "starting test" << std::endl;
 
@@ -329,9 +359,14 @@ int main(int argc, char** argv)
 {
 	std::cout << "--> program started <--" << std::endl << std::endl;
 
-	// Mesh mesh;
-	// std::ifstream is ("input_data/light/custom_mesh.off");
-	// Mesh mesh; is >> mesh;
+	std::ifstream is ("input_data/light/custom_mesh_flat.off");
+	Mesh mesh; is >> mesh;
+
+	Point_set pcd;
+	pcd.insert(Point(0,0,1));
+	pcd.insert(Point(0,2,2));
+	pcd.insert(Point(-2,1,3));
+	mean_and_max_distance_from_P_to_mesh(pcd, mesh);
 	// Mesh mesh = read_OBJ_mesh("input_data/heavy/open_data_strasbourg/PC3E45/PC3E45_3.obj");
 	// // Mesh mesh = read_OBJ_mesh("input_data/heavy/cow.obj");
 
@@ -347,7 +382,7 @@ int main(int argc, char** argv)
 	// is_pcd >> pcd;
 
 
-	// int nbRmVert = CGAL::Polygon_mesh_processing::remove_isolated_vertices(mesh);
+	// int nbRmVert = PMP::remove_isolated_vertices(mesh);
 	// std::cout << nbRmVert << " isolated vertices removed" << std::endl;
 
 	// Mesh mesh_alpha = Mesh_alpha(mesh, pcd, 1);
@@ -355,7 +390,7 @@ int main(int argc, char** argv)
 	// std::ofstream of("output_data/mesh_alpha_strasbourg.off");
 	// write_off(of,mesh_alpha);
 
-	test();
+	// test();
 
 	std::cout << "--> program ended <--" << std::endl;
 	return 0;
