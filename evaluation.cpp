@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
-#include <string>
+#include <string.h>
+#include <array>
 #include <map>
 #include <math.h>
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
@@ -43,7 +44,7 @@ typedef CGAL::Point_set_3<Point> Point_set;
 
 // shortest path
 typedef CGAL::Surface_mesh_shortest_path_traits<K, Mesh> Traits;
-typedef CGAL::Surface_mesh_shortest_path<Traits> Surface_mesh_shortest_path;
+typedef CGAL::Surface_mesh_shortest_path<Traits> SM_shortest_path;
 
 // iterators and descriptors
 typedef boost::graph_traits<Mesh>::face_descriptor face_descriptor;
@@ -105,9 +106,8 @@ Mesh read_OBJ_mesh(const char* fileName){
 	return mesh;
 }
 
-Surface_mesh_shortest_path build_shortest_path(Mesh &mesh, Point_set &pcd){
+void build_shortest_path(Point_set &pcd, SM_shortest_path &shortest_paths){
 	std::cout << "---> Building Shortest Path Sequence Tree" << std::endl;
-	Surface_mesh_shortest_path shortest_paths(mesh);
 	// Tree tree(faces(mesh).first, faces(mesh).second, mesh); // AABB_tree of the mesh
 	Tree tree;
 	shortest_paths.build_aabb_tree(tree); // Creates an AABB_tree suitable for use with locate
@@ -119,7 +119,6 @@ Surface_mesh_shortest_path build_shortest_path(Mesh &mesh, Point_set &pcd){
 	std::cout << " Number of source points: " << shortest_paths.number_of_source_points() << std::endl;
 	shortest_paths.build_sequence_tree();
 	std::cout << " Done with building sequence tree" << std::endl;
-	return shortest_paths;
 }
 
 std::array<vertex_descriptor, 3> face_alpha(std::map<vertex_descriptor, vertex_descriptor> &mapRefAlpha,
@@ -149,7 +148,39 @@ std::array<vertex_descriptor, 3> face_alpha(std::map<vertex_descriptor, vertex_d
 	return face_a;
 }
 
-Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha){
+void build_search_structure(bool geodesic,
+							Point_set &pcd,
+							SM_shortest_path &shortest_paths,
+							TreeNS &tree ){	
+	if (geodesic) // using geodesic distance
+	{
+		build_shortest_path(pcd, shortest_paths);
+	} else { // using euclidean distance
+		for (Point_set::iterator it = pcd.begin(); it != pcd.end(); ++it){
+			tree.insert(pcd.point(*it));
+		}
+	}
+}
+
+double geod_or_eucli_distance(bool geodesic,
+							  SM_shortest_path &shortest_paths,
+							  vertex_descriptor &vd,
+							  Point &p,
+							  TreeNS &tree
+							  ){
+	double dist = 0;
+	if (geodesic) // geodesic distance
+	{
+		dist = get<0>(shortest_paths.shortest_distance_to_source_points(vd));
+	} else {  // euclidean distance
+		Neighbor_search search(tree, p, 1);
+		Neighbor_search::iterator itS = search.begin(); // only one neighbor
+		dist = std::sqrt(itS->second);
+	}
+	return dist;
+}
+
+Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic){
 	/*
 		usage:
 			- compute the "reconstructible" part of a mesh based on a
@@ -167,7 +198,12 @@ Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha){
 	*/
 	std::cout << "---> Computing mesh_alpha (reconstructible part of mesh)"
 			  << std::endl;
-	std::cout << "  max geodesic distance: " << alpha << std::endl;
+	if (geodesic) {
+		std::cout << "  max geodesic distance: " << alpha << std::endl;
+	} else {
+		std::cout << "  max euclidean distance: " << alpha << std::endl;
+	}
+	
 	Mesh mesh_alpha;
 
 	// vertices and faces of mesh already appended to mesh_alpha:
@@ -175,25 +211,23 @@ Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha){
 	std::vector<Mesh::Face_index> mAlpha_f;
 
 	// correspondance map between vertex indices of mesh and mesh_alpha:
-	// Vertex_map_meshes mapRefAlpha;
 	std::map<vertex_descriptor, vertex_descriptor> mapRefAlpha;
 
-	Surface_mesh_shortest_path shortest_paths = build_shortest_path(mesh, pcd);
-
-	CGAL::Face_around_target_iterator<Mesh> face_b, face_e;
+	// search structure:
+	TreeNS tree; // euclidean distance
+	SM_shortest_path shortest_paths(mesh); // geodesic distance
+	build_search_structure(geodesic, pcd, shortest_paths, tree);
 
 	for (vertex_descriptor vd : vertices(mesh)){
 		Point p = mesh.point(vd);
 		// std::cout << std::endl << vd << " : " << p << std::endl;
-
-		// calculate face and barycentric coordinate of vd
-		// and set as target
-		double d = get<0>(shortest_paths.shortest_distance_to_source_points(vd));
+		double d = geod_or_eucli_distance(geodesic, shortest_paths, vd, p, tree);
 		// std::cout << "distance to source points: " << d << std::endl;
 
 		if (d < alpha && d >= 0){
 		// if (d < alpha){
 			// browse all faces incident to vertex vd:
+			CGAL::Face_around_target_iterator<Mesh> face_b, face_e;
 			for (boost::tie(face_b, face_e) = CGAL::faces_around_target(mesh.halfedge(vd),mesh);
 			face_b != face_e;
 			++face_b)
@@ -307,6 +341,29 @@ void mean_and_max_distance_from_P_to_mesh(Point_set &pcd, Mesh &mesh){
 	std::cout << "max distance: " << max << std::endl;
 }
 
+void range_mesh_alpha(const char* fileName, std::array<double,5> alphas){
+	Mesh mesh = read_OBJ_mesh(fileName); // .obj only !
+	// std::ifstream iii(fileName);
+	// Mesh mesh;
+	// if (CGAL::read_ply(iii, mesh)){
+	// 	std::cout << "mesh read succesfully" << std::endl;
+	// } else {
+	// 	std::cout << "ERROR while reading" << std::endl;
+	// }
+	std::ifstream is_pcd ("pipeline_evaluation/GT-LiDAR/strasbourg_station-aerial.ply"); // to change
+	Point_set pcd; is_pcd >> pcd;
+	std::string outBaseName = "pipeline_evaluation/recon-mesh_alpha/strasbourg_station-PoissonRecon_alpha_"; // to change
+	for (int i = 0; i != alphas.size(); i++){
+		double alpha = alphas[i];
+		std::cout << "alpha: " << alpha << std::endl;
+		Mesh mesh_alpha = Mesh_alpha(mesh, pcd, alpha, false);
+		std::string outfile = outBaseName + std::to_string(alpha) + ".off";
+		std::ofstream of(outfile);
+		write_off(of,mesh_alpha);
+		std::cout << "wrote: " << (outfile) << std::endl << std::endl;
+	}
+}
+
 void test(){
 	std::cout << "starting test" << std::endl;
 
@@ -359,14 +416,18 @@ int main(int argc, char** argv)
 {
 	std::cout << "--> program started <--" << std::endl << std::endl;
 
-	std::ifstream is ("input_data/light/custom_mesh_flat.off");
-	Mesh mesh; is >> mesh;
+	// std::ifstream is ("input_data/light/custom_mesh_flat.off");
+	// Mesh mesh; is >> mesh;
 
-	Point_set pcd;
-	pcd.insert(Point(0,0,1));
-	pcd.insert(Point(0,2,2));
-	pcd.insert(Point(-2,1,3));
-	mean_and_max_distance_from_P_to_mesh(pcd, mesh);
+	// Point_set pcd;
+	// pcd.insert(Point(0,0,1));
+	// pcd.insert(Point(0,2,2));
+	// pcd.insert(Point(-2,1,3));
+	// mean_and_max_distance_from_P_to_mesh(pcd, mesh);
+
+	std::array<double,5> alphas {0.2, 0.4, 0.6, 1.0, 2.0};
+	// range_mesh_alpha("pipeline_evaluation/GT-mesh/strasbourg_station.obj", alphas);
+	range_mesh_alpha("pipeline_evaluation/recon-mesh/strasbourg_station-PoissonRecon.obj", alphas);
 	// Mesh mesh = read_OBJ_mesh("input_data/heavy/open_data_strasbourg/PC3E45/PC3E45_3.obj");
 	// // Mesh mesh = read_OBJ_mesh("input_data/heavy/cow.obj");
 
