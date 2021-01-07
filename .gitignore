@@ -21,14 +21,14 @@ pipeline_evaluation/recon-sampling/*
 !pipeline_evaluation/.gitkeep
 !pipeline_evaluation/PDS.mlx
 
-pipeline_evaluation/GT-LiDAR/.gitkeep
-pipeline_evaluation/GT-mesh/.gitkeep
-pipeline_evaluation/GT-mesh_alpha/.gitkeep
-pipeline_evaluation/GT-mesh_alpha_PDS/.gitkeep
-pipeline_evaluation/GT-mesh_alpha_PDS_processed/.gitkeep
-pipeline_evaluation/recon-mesh/.gitkeep
-pipeline_evaluation/recon-mesh_alpha/.gitkeep
-pipeline_evaluation/recon-sampling/.gitkeep
+!pipeline_evaluation/GT-LiDAR/.gitkeep
+!pipeline_evaluation/GT-mesh/.gitkeep
+!pipeline_evaluation/GT-mesh_alpha/.gitkeep
+!pipeline_evaluation/GT-mesh_alpha_PDS/.gitkeep
+!pipeline_evaluation/GT-mesh_alpha_PDS_processed/.gitkeep
+!pipeline_evaluation/recon-mesh/.gitkeep
+!pipeline_evaluation/recon-mesh_alpha/.gitkeep
+!pipeline_evaluation/recon-sampling/.gitkeep
 
 
 # executables :
