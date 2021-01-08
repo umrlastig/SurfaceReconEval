@@ -1,34 +1,16 @@
 # directories :
 CMakeFiles/
-input_data/heavy/*
+pipeline_evaluation/evaluations/
 
 # directory content :
 output_data/*
-pipeline_evaluation/*
+input_data/heavy/*
 
-pipeline_evaluation/GT-LiDAR/*
-pipeline_evaluation/GT-mesh/*
-pipeline_evaluation/GT-mesh_alpha/*
-pipeline_evaluation/GT-mesh_alpha_PDS/*
-pipeline_evaluation/GT-mesh_alpha_PDS_processed/*
-pipeline_evaluation/recon-mesh/*
-pipeline_evaluation/recon-mesh_alpha/*
-pipeline_evaluation/recon-sampling/*
+pipeline_evaluation/input/*
 
 # exception :
 !output_data/.gitkeep
 !input_data/heavy/.gitkeep
-!pipeline_evaluation/.gitkeep
-!pipeline_evaluation/PDS.mlx
-
-!pipeline_evaluation/GT-LiDAR/.gitkeep
-!pipeline_evaluation/GT-mesh/.gitkeep
-!pipeline_evaluation/GT-mesh_alpha/.gitkeep
-!pipeline_evaluation/GT-mesh_alpha_PDS/.gitkeep
-!pipeline_evaluation/GT-mesh_alpha_PDS_processed/.gitkeep
-!pipeline_evaluation/recon-mesh/.gitkeep
-!pipeline_evaluation/recon-mesh_alpha/.gitkeep
-!pipeline_evaluation/recon-sampling/.gitkeep
 
 
 # executables :
