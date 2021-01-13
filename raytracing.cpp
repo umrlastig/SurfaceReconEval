@@ -414,7 +414,7 @@ Mesh read_OBJ_mesh(const char* fileName){
 
 Mesh read_input_file(const char* fileName){
 	/*
-	Use the proper function absed on the extension of the input file
+	Use the proper function based on the extension of the input file
 	*/
 	Mesh mesh;
 	std::string extension = std::string(fileName).substr(std::string(fileName).find_last_of(".") + 1);

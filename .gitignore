@@ -16,6 +16,9 @@ pipeline_evaluation/input/*
 # executables :
 raytracing
 evaluation
+mean_and_max_distance_from_P_to_mesh
+mesh_alpha
+remove_points_too_far_from_P
 
 # cmake-related :
 CMakeLists.txt
