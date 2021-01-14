@@ -12,6 +12,7 @@ mesh_alpha_exec="./../mesh_alpha"
 remove_points_too_far_from_P="./../remove_points_too_far_from_P"
 mean_and_max_distance_from_P_to_mesh="./../mean_and_max_distance_from_P_to_mesh"
 
+verbose="0" # set to "1" if desired
 strAlpha="_alpha_"
 ext=".ply"
 
@@ -27,6 +28,8 @@ DIR_mesh="mesh"; DIRS+=($DIR_mesh)
 DIR_mesh_alpha="mesh_alpha"; DIRS+=($DIR_mesh_alpha)
 DIR_mesh_alpha_PDS="mesh_alpha_PDS"; DIRS+=($DIR_mesh_alpha_PDS)
 DIR_mesh_alpha_PDS_processed="mesh_alpha_PDS_processed"; DIRS+=($DIR_mesh_alpha_PDS_processed)
+DIR_results="results"; DIRS+=($DIR_results)
+DIR_logs="logs"; DIRS+=($DIR_logs)
 DIR_EVALUATIONS="evaluations"
 ###############
 
@@ -35,6 +38,27 @@ DIR_EVALUATIONS="evaluations"
 #############
 # Functions #
 #############
+func_update_PDS_radius() {
+  newR=$1
+  left="<Param type=\"RichAbsPerc\" value=\""
+  right="\" min=\"0\" name=\"Radius\" max=\"356.693\"\/>"
+  cmd="sed -i 's/${left}.*${right}/${left}${newR}${right}/g' ${pds_script}"
+  eval ${cmd}
+}
+
+func_generate_log_res_file() {
+  file=$1
+
+  evalBasename=$(basename -- "$file") # removes path
+  evalBasename="${evalBasename%.*}" # removes extension
+
+  logName="_LOG"; extLog=".txt"
+  resName="_RESULTS"; extRes=".txt"
+
+  logFile="${EVALUATION}/${DIR_logs}/${evalBasename}${logName}${extLog}"
+  resFile="${EVALUATION}/${DIR_results}/${evalBasename}${resName}${extRes}"
+}
+
 func_process_mesh() {
   meshFile=$1
 
@@ -56,13 +80,14 @@ func_process_mesh() {
       ${meshFile}\
       ${GT_LiDAR}\
       ${alpha}\
-      ${outMesh}"
+      ${outMesh}\
+      ${verbose}"
     # echo "Executing ${cmd}"
     eval ${cmd}
 
 
     # 2. Poisson disk sampling
-    echo -e "\n--> COMPUTING POISSON DISK SAMPLING"
+    echo -e "\n--> COMPUTING POISSON DISK SAMPLING\n"
     inMesh=${outMesh}
     outPointSet="${EVALUATION}/${DIR_mesh_alpha_PDS}/${fileName}"
     cmd="LC_ALL=C meshlabserver\
@@ -81,7 +106,8 @@ func_process_mesh() {
       ${inPointSet}\
       ${GT_LiDAR}\
       ${alpha}\
-      ${outPointSet}"
+      ${outPointSet}\
+      ${verbose}"
     # echo "executing: ${cmd}"
     eval ${cmd}
   done
@@ -90,7 +116,7 @@ func_process_mesh() {
 func_run_distance_computation() {
   pcdFile=$1
   meshFile=$2
-  outFile=$3
+  resFile=$3
 
   # check existence of files
   ./check_file_exists.sh "${pcdFile}"; if [ $? -ne 0 ]; then exit 1; fi
@@ -99,19 +125,25 @@ func_run_distance_computation() {
   cmd="${mean_and_max_distance_from_P_to_mesh}\
     ${pcdFile}\
     ${meshFile}\
-    ${outFile}"
+    ${resFile}\
+    ${verbose}"
   # echo "executing ${cmd}"
   eval ${cmd}
 }
 
 func_compute_distances() {
   file=$1 # the one from ${DIR_mesh}
-  outFile="someFile.gnumeric"
+
+  # generate a file name for results storing:
+  resName="_RESULTS"; extRes=".txt"
+  extFile="${file##*.}"
+  evalBasename=$(basename -- "$file") # removes path
+  evalBasename="${evalBasename%.*}" # removes extension
+  resFile="${EVALUATION}/${DIR_results}/${evalBasename}${resName}${extRes}"
+
   echo -e "\n\n--> ASSESSMENT OF: '$(basename -- "$file")'"
 
 
-  evalBasename=$(basename -- "$file") # removes path
-  evalBasename="${evalBasename%.*}" # removes extension
 
   for alpha in "${TAB_ALPHAS[@]}"; do
     echo -e "\nalpha : ${alpha}"
@@ -121,15 +153,15 @@ func_compute_distances() {
     echo "[PRECISION]"
     pcdFile="${EVALUATION}/${DIR_mesh_alpha_PDS_processed}/${fileName}"
     meshFile="${EVALUATION}/${DIR_mesh_alpha}/${fileNameGT}${strAlpha}${alpha}${ext}"
-    func_run_distance_computation ${pcdFile} ${meshFile} ${outFile}
+    func_run_distance_computation ${pcdFile} ${meshFile} ${resFile}
 
     # RECALL: pcd=GT_PDS / mesh=RECON_alpha
     echo "[RECALL]"
     pcdFile="${EVALUATION}/${DIR_mesh_alpha_PDS_processed}/${fileNameGT}${strAlpha}${alpha}${ext}"
     meshFile="${EVALUATION}/${DIR_mesh_alpha}/${fileName}"
-    func_run_distance_computation ${pcdFile} ${meshFile} ${outFile}
+    func_run_distance_computation ${pcdFile} ${meshFile} ${resFile}
   done
-
+  echo -e "\n# assessment done"
 }
 #############
 
@@ -174,11 +206,12 @@ do
     done
   fi
 
-  # read poisson-disk sampling radius:
+  # read poisson-disk sampling radius and update PDS script:
   if [[ ${line} =~ "PDS_RADIUS" ]]; then
     echo "  > ${line}"
     PDS_RADIUS=$(echo $line| cut -d'=' -f 2)
   fi
+  func_update_PDS_radius ${PDS_RADIUS}
 done < "${param_file}"
 ##############
 
@@ -242,13 +275,17 @@ echo -e "Started the process"
 #############
 # EXECUTION #
 #############
+## Mesh processing
 for file in "${EVALUATION}/${DIR_mesh}"/*; do
-  func_process_mesh ${file}
+  func_generate_log_res_file ${file}
+  func_process_mesh ${file} 2>&1 | tee -a ${logFile}
 done
 
+## Assessment
 for file in "${EVALUATION}/${DIR_mesh}"/*; do
   if [ ${file} != ${GT_MESH} ]; then # do not evaluate ground-truth
-    func_compute_distances ${file}
+  	func_generate_log_res_file ${file}
+    func_compute_distances ${file} | tee ${resFile}
   fi
 done
 #############

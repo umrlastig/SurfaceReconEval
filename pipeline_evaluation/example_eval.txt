@@ -2,7 +2,8 @@
 
 GT_MESH=input/strasbourg_station.obj
 GT_LiDAR=input/strasbourg_station-aerial.ply
-ALPHAS=1.2|2
-PDS_RADIUS=1.0
+ALPHAS=1.2|2|3
+A!break!LPHAS=1.2
+PDS_RADIUS=2
 
 # end_of_file

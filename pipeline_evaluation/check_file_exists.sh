@@ -4,7 +4,8 @@ if [ "$#" -eq 1 ]; then
   file=$1
   # check if file exists:
   if [[ -f ${file} ]]; then
-    echo " OK: '${file}' does exist"
+    : # do nothing
+    # echo " OK: '${file}' does exist"
   else
     echo -e "ERROR: '${file}' not found!\nProgram ended unsuccessfully :("
     exit 1
