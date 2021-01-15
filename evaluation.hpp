@@ -18,10 +18,6 @@
 #include <CGAL/IO/OBJ_reader.h>
 #include <CGAL/IO/PLY_reader.h>
 #include <CGAL/IO/OFF_reader.h>
-// #include <CGAL/IO/read_ply_points.h>
-// #include <CGAL/IO/read_off_points.h>
-// #include <CGAL/IO/write_off_points.h>
-// #include <CGAL/IO/write_ply_points.h>
 #include <CGAL/boost/graph/io.h>
 
 #include <CGAL/boost/graph/iterator.h>
@@ -87,7 +83,7 @@ Mesh read_OBJ_mesh(const char* fileName, bool verbose){
 	std::vector<Point> points;
 	std::vector<std::vector<std::size_t>> polygons;
 
-	if (!CGAL::read_OBJ(is, points, polygons)) std::cout << "\nERROR: impossible to read mesh\n" << std::endl;
+	if (!CGAL::read_OBJ(is, points, polygons)) std::cerr << "\nERROR: impossible to read mesh\n" << std::endl;
 	if (verbose) std::cout << "number of points: " << points.size() << std::endl;
 	if (verbose) std::cout << "number of polygons: " << polygons.size() << std::endl;
 
@@ -115,56 +111,54 @@ Mesh read_OBJ_mesh(const char* fileName, bool verbose){
 	return mesh;
 }
 
-Mesh readMesh(const char* fileName){
-	std::cout << "---> READING MESH: " << fileName << std::endl;
+Mesh readMesh(const char* fileName, bool verbose){
+	if (verbose) std::cout << "---> READING MESH: " << fileName << std::endl;
 	Mesh mesh; std::ifstream is (fileName);
+
 	// Determine extension then extract points and polygons
-	// std::string extension = std::string(fileName).substr(std::string(fileName).find_last_of(".") + 1);
 	std::string extension = getFileExt(fileName);
 	if (extension == "obj"){
-		bool verbose = false;
 		mesh = read_OBJ_mesh(fileName, verbose);
 	} else if (extension == "ply") {
-		if (!read_ply(is, mesh)) std::cout << "\nERROR: impossible to read mesh\n" << std::endl;
+		if (!read_ply(is, mesh)) std::cerr << "\nERROR: impossible to read mesh\n" << std::endl;
 		// std::vector<Point> points;
 		// std::vector<std::vector<std::size_t>> polygons;
 		// std::vector<CGAL::Color> fcolors;
 		// std::vector<CGAL::Color> vcolors;
 		// bool success = CGAL::read_PLY (is, points, polygons, fcolors, vcolors);
 		// if (success) std::cout << "success" << std::endl;
-		// std::cout << "###number of points: " << points.size() << std::endl;
-		// std::cout << "###number of polygons: " << polygons.size() << std::endl;
+		// std::cout << "number of points: " << points.size() << std::endl;
+		// std::cout << "number of polygons: " << polygons.size() << std::endl;
 		// PMP::polygon_soup_to_polygon_mesh(points, polygons, mesh);
 	} else if (extension == "off") {
-		if (!read_off(is, mesh)) std::cout << "\nERROR: impossible to read mesh\n" << std::endl;
+		if (!read_off(is, mesh)) std::cerr << "\nERROR: impossible to read mesh\n" << std::endl;
 	} else {
 		std::cout << "\nERROR: extension [." << extension << "] not readable.\n" << std::endl;
 	}
-	std::cout << "Number of points: " << mesh.number_of_vertices() << std::endl;
-	std::cout << "Number of faces: " << mesh.number_of_faces() << std::endl;
+	if (verbose) std::cout << "Number of points: " << mesh.number_of_vertices() << std::endl;
+	if (verbose) std::cout << "Number of faces: " << mesh.number_of_faces() << std::endl;
 	return mesh;
 }
 
-Point_set readPointSet(const char* fileName){
-	std::cout << "---> READING POINT SET: " << fileName << std::endl;
+Point_set readPointSet(const char* fileName, bool verbose){
+	if (verbose) std::cout << "---> READING POINT SET: " << fileName << std::endl;
 	Point_set pcd; std::ifstream is (fileName);
 
 	std::string extension = getFileExt(fileName);
 	if (extension == "ply") {
-		// if (!CGAL::read_ply_points(is, pcd.point_back_inserter())) std::cout
-		if (!CGAL::read_ply_point_set(is, pcd)) std::cout
+		if (!CGAL::read_ply_point_set(is, pcd)) std::cerr
 			<< "\nERROR: impossible to read point set\n" << std::endl;
 	} else if (extension == "off") {
-		if (!CGAL::read_off_point_set(is, pcd)) std::cout
+		if (!CGAL::read_off_point_set(is, pcd)) std::cerr
 			<< "\nERROR: impossible to read mesh\n" << std::endl;
 	} else {
-		std::cout << "\nERROR: extension [." << extension << "] not readable.\n" << std::endl;
+		std::cerr << "\nERROR: extension [." << extension << "] not readable.\n" << std::endl;
 	}
-	std::cout << "Number of points: " << pcd.number_of_points() << std::endl;
+	if (verbose) std::cout << "Number of points: " << pcd.number_of_points() << std::endl;
 	return pcd;
 }
 
-void writeMesh(const char* fileName, Mesh &mesh){
+void writeMesh(const char* fileName, Mesh &mesh, bool verbose){
 	std::ofstream of(fileName);
 	bool success = false;
 
@@ -175,17 +169,17 @@ void writeMesh(const char* fileName, Mesh &mesh){
 	} else if (extension == "off") {
 		success = write_off(of, mesh);
 	} else {
-		std::cout << "ERROR: extension [." << extension << "] not writable." << std::endl;
+		std::cerr << "ERROR: extension [." << extension << "] not writable." << std::endl;
 	}
 	// Outcome:
 	if (success){
-		std::cout << "wrote: " << fileName << std::endl;
+		if (verbose) std::cout << "wrote: " << fileName << std::endl;
 	} else {
-		std::cout << "ERROR: impossible to write '" << fileName << "'" << std::endl;
+		std::cerr << "ERROR: impossible to write '" << fileName << "'" << std::endl;
 	}
 }
 
-void writePointSet(const char* fileName, Point_set &pcd){
+void writePointSet(const char* fileName, Point_set &pcd, bool verbose){
 	std::ofstream of(fileName);
 	bool success = false;
 
@@ -196,18 +190,18 @@ void writePointSet(const char* fileName, Point_set &pcd){
 	} else if (extension == "off") {
 		success = CGAL::write_off_point_set(of, pcd);
 	} else {
-		std::cout << "ERROR: extension [." << extension << "] not writable." << std::endl;
+		std::cerr << "ERROR: extension [." << extension << "] not writable." << std::endl;
 	}
 	// Outcome:
 	if (success){
-		std::cout << "wrote: " << fileName << std::endl;
+		if (verbose) std::cout << "wrote: " << fileName << std::endl;
 	} else {
-		std::cout << "ERROR: impossible to write '" << fileName << "'" << std::endl;
+		std::cerr << "ERROR: impossible to write '" << fileName << "'" << std::endl;
 	}
 }
 
-void build_shortest_path(Point_set &pcd, SM_shortest_path &shortest_paths){
-	std::cout << "---> Building Shortest Path Sequence Tree" << std::endl;
+void build_shortest_path(Point_set &pcd, SM_shortest_path &shortest_paths, bool verbose){
+	if (verbose) std::cout << "---> Building Shortest Path Sequence Tree" << std::endl;
 	// Tree tree(faces(mesh).first, faces(mesh).second, mesh); // AABB_tree of the mesh
 	Tree tree;
 	shortest_paths.build_aabb_tree(tree); // Creates an AABB_tree suitable for use with locate
@@ -216,9 +210,12 @@ void build_shortest_path(Point_set &pcd, SM_shortest_path &shortest_paths){
 		// add point *pi to source:
 		shortest_paths.add_source_point( shortest_paths.locate(pcd.point(*pi), tree) );
 	}
-	std::cout << " Number of source points: " << shortest_paths.number_of_source_points() << std::endl;
+	if (verbose) std::cout << " Number of source points: " <<
+		shortest_paths.number_of_source_points() << std::endl;
+
 	shortest_paths.build_sequence_tree();
-	std::cout << " Done with building sequence tree" << std::endl;
+
+	if (verbose) std::cout << " Done with building sequence tree" << std::endl;
 }
 
 std::array<vertex_descriptor, 3> face_alpha(std::map<vertex_descriptor, vertex_descriptor> &mapRefAlpha,
@@ -251,10 +248,11 @@ std::array<vertex_descriptor, 3> face_alpha(std::map<vertex_descriptor, vertex_d
 void build_search_structure(bool geodesic,
 							Point_set &pcd,
 							SM_shortest_path &shortest_paths,
-							TreeNS &tree ){	
+							TreeNS &tree,
+							bool verbose ){	
 	if (geodesic) // using geodesic distance
 	{
-		build_shortest_path(pcd, shortest_paths);
+		build_shortest_path(pcd, shortest_paths, verbose);
 	} else { // using euclidean distance
 		for (Point_set::iterator it = pcd.begin(); it != pcd.end(); ++it){
 			tree.insert(pcd.point(*it));
@@ -280,7 +278,7 @@ double geod_or_eucli_distance(bool geodesic,
 	return dist;
 }
 
-Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool verbose){
+Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool verbose, bool debug){
 	/*
 		usage:
 			- compute the "reconstructible" part of a mesh based on a
@@ -296,15 +294,15 @@ Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool ve
 			- mesh_alpha: the subset of in:mesh for which triangles are
 						  closer than in:alpha to in:pcd
 	*/
-	std::cout << "\n---> Computing mesh_alpha (reconstructible part of mesh)"
+	if (verbose) std::cout << "\n---> Computing mesh_alpha (reconstructible part of mesh)"
 			  << std::endl;
 	if (geodesic) {
-		std::cout << "     max geodesic distance: " << alpha << std::endl;
+		if (verbose) std::cout << "     max geodesic distance: " << alpha << std::endl;
 	} else {
-		std::cout << "     max euclidean distance: " << alpha << std::endl;
+		if (verbose) std::cout << "     max euclidean distance: " << alpha << std::endl;
 	}
 	
-	Mesh mesh_alpha;
+	Mesh meshAlpha;
 
 	// vertices and faces of mesh already appended to mesh_alpha:
 	std::vector<vertex_descriptor> mAlpha_v;
@@ -316,13 +314,13 @@ Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool ve
 	// search structure:
 	TreeNS tree; // euclidean distance
 	SM_shortest_path shortest_paths(mesh); // geodesic distance
-	build_search_structure(geodesic, pcd, shortest_paths, tree);
+	build_search_structure(geodesic, pcd, shortest_paths, tree, verbose);
 
 	for (vertex_descriptor vd : vertices(mesh)){
 		Point p = mesh.point(vd);
-		if (verbose) std::cout << std::endl << vd << ": [" << p << "]" << std::endl;
+		if (debug) std::cout << std::endl << vd << ": [" << p << "]" << std::endl;
 		double d = geod_or_eucli_distance(geodesic, shortest_paths, vd, p, tree);
-		if (verbose) std::cout << "distance to source points: " << d << std::endl;
+		if (debug) std::cout << "distance to source points: " << d << std::endl;
 
 		if (d < alpha && d >= 0){
 		// if (d < alpha){
@@ -334,21 +332,20 @@ Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool ve
 			{
 				if (face_b->is_valid()) // faces_around_target returns invalid faces for border vertices
 				{
-					// std::cout << "Step_1" << std::endl;
-					if (verbose) std::cout << " > " << *face_b << std::endl;
+					if (debug) std::cout << " > " << *face_b << std::endl;
 					// check if face_b is in mAlpha_f:
 					if (std::find(mAlpha_f.begin(), mAlpha_f.end(), *face_b) == mAlpha_f.end()){
 						// not already in mAlpha_f
 						std::array<vertex_descriptor, 3> face_ref; // to store indices of face in mesh_ref
 						int i = 0;
-						if (verbose) std::cout << "  - ";
+						if (debug) std::cout << "  - ";
 						// browse all vertices adjacent to the face face_b:
 						CGAL::Vertex_around_face_iterator<Mesh> vb,ve;
 						for (boost::tie(vb,ve)=CGAL::vertices_around_face(mesh.halfedge(*face_b),mesh);
 						vb != ve;
 						++vb)
 						{
-							if (verbose) std::cout << *vb << " ";
+							if (debug) std::cout << *vb << " ";
 							// add vertex *vb to current face:
 							face_ref[i] = *vb; i++;
 
@@ -357,28 +354,28 @@ Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool ve
 								mAlpha_v.push_back(*vb); // ... add it
 
 								// add vertex *vb to mesh alpha:
-								vertex_descriptor vb_alpha = mesh_alpha.add_vertex(mesh.point(*vb));
+								vertex_descriptor vb_alpha = meshAlpha.add_vertex(mesh.point(*vb));
 
 								// update map:
 								mapRefAlpha.insert( std::pair<vertex_descriptor, vertex_descriptor>(*vb, vb_alpha) );
 							}
 						}
-						if (verbose) std::cout << std::endl;
+						if (debug) std::cout << std::endl;
 						mAlpha_f.push_back(*face_b); // ... add face
 						// Now, we are sure every vertices of *face_b are in mesh alpha
 						// so we can add *face_b to M_alpha
 						std::array<vertex_descriptor, 3> face_a = face_alpha(mapRefAlpha, face_ref);
-						mesh_alpha.add_face(face_a);
+						meshAlpha.add_face(face_a);
 					}
 				}
 			}
 		}
 	}
-	std::cout << "     Done with mesh_alpha computation" << std::endl;
-	return mesh_alpha;
+	if (verbose) std::cout << "     Done with mesh_alpha computation" << std::endl;
+	return meshAlpha;
 }
 
-void remove_points_too_far_from_P(Point_set &pcd, Point_set &P, double alpha){
+void remove_points_too_far_from_P(Point_set &pcd, Point_set &P, double alpha, bool verbose){
 	/*
 		usage:
 			- Remove points from in:pcd that are farther from P than in:alpha
@@ -388,7 +385,8 @@ void remove_points_too_far_from_P(Point_set &pcd, Point_set &P, double alpha){
 			- alpha: the distance above which a point is deleted
 	*/
 
-	std::cout << "Started removing points farther than alpha = " << alpha << " from P" << std::endl;
+	if (verbose) std::cout << "Started removing points farther than alpha = "
+		<< alpha << " from P" << std::endl;
 
 	TreeNS tree(P.points().begin(), P.points().end());
 	std::vector<Point_set::const_iterator> ptsToRemove;
@@ -407,18 +405,17 @@ void remove_points_too_far_from_P(Point_set &pcd, Point_set &P, double alpha){
 			ptsToRemove.push_back(pi); // store point to remove
 		}
 	}
-
 	// remove all points too far:
 	for (int i = 0; i != ptsToRemove.size(); ++i){
 		pcd.remove(*ptsToRemove[i]);
 	}
-
-	std::cout << "Done: " << ptsToRemove.size() << " point(s) removed" << std::endl;
+	if (verbose) std::cout << "Done: " << ptsToRemove.size() << " point(s) removed" << std::endl;
 }
 
-double mean_distance_from_P_to_mesh(Point_set &pcd, Mesh &mesh){
+void mean_and_max_distance_from_P_to_mesh(Point_set &pcd, Mesh &mesh){
 	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
 	double mean_distance = 0;
+	double max_distance = 0;
 	for (Point_set::const_iterator pi = pcd.begin(); pi != pcd.end(); ++pi){
 		Point query = pcd.point(*pi);
 		// Point closest = tree.closest_point(query); // optional
@@ -428,132 +425,17 @@ double mean_distance_from_P_to_mesh(Point_set &pcd, Mesh &mesh){
 		// std::cout << "closest: " << closest << std::endl;
 		// std::cout << "distance: " << distance << std::endl << std::endl;
 
+		// update distances
 		mean_distance += distance;
+		max_distance = (distance > max_distance) ? distance : max_distance;
 	}
 	int nbPts = pcd.end() - pcd.begin();
 	mean_distance /= nbPts;
-	return mean_distance;
+
+	// CGAL built-in function for max distance computation:
+	// double max = PMP::max_distance_to_triangle_mesh<CGAL::Sequential_tag>(pcd.points(), mesh);
+
+	std::cout << "mean distance: " << mean_distance << std::endl;
+	std::cout << "max distance: " << max_distance << std::endl;
 }
 
-void mean_and_max_distance_from_P_to_mesh(Point_set &pcd, Mesh &mesh){
-	double mean = mean_distance_from_P_to_mesh(pcd, mesh);
-	double max = PMP::max_distance_to_triangle_mesh<CGAL::Sequential_tag>(pcd.points(), mesh);
-	std::cout << "mean distance: " << mean << std::endl;
-	std::cout << "max distance: " << max << std::endl;
-}
-
-// void range_mesh_alpha(const char* fileName, std::array<double,5> alphas){
-// 	Mesh mesh = readMesh(fileName); // .obj only !
-// 	// std::ifstream iii(fileName);
-// 	// Mesh mesh;
-// 	// if (CGAL::read_ply(iii, mesh)){
-// 	// 	std::cout << "mesh read succesfully" << std::endl;
-// 	// } else {
-// 	// 	std::cout << "ERROR while reading" << std::endl;
-// 	// }
-// 	std::ifstream is_pcd ("pipeline_evaluation/GT-LiDAR/strasbourg_station-aerial.ply"); // to change
-// 	Point_set pcd; is_pcd >> pcd;
-// 	std::string outBaseName = "pipeline_evaluation/recon-mesh_alpha/strasbourg_station-PoissonRecon_alpha_"; // to change
-// 	for (int i = 0; i != alphas.size(); i++){
-// 		double alpha = alphas[i];
-// 		std::cout << "alpha: " << alpha << std::endl;
-// 		Mesh mesh_alpha = Mesh_alpha(mesh, pcd, alpha, false, false);
-// 		std::string outfile = outBaseName + std::to_string(alpha) + ".off";
-// 		std::ofstream of(outfile);
-// 		write_off(of,mesh_alpha);
-// 		std::cout << "wrote: " << (outfile) << std::endl << std::endl;
-// 	}
-// }
-
-void test(){
-	std::cout << "starting test" << std::endl;
-
-	Point_set P;
-	P.insert(Point(0.1, 0.1, 0.1));
-	P.insert(Point(0.1, 5, 6));
-	P.insert(Point(0.1, 7, 6));
-	P.insert(Point(0.1, 40, 6));
-	P.insert(Point(0.1, 28, 2));
-
-	Point_set pcd;
-	pcd.insert(Point(0,0,0));
-	pcd.insert(Point(-1,-1,0));
-
-	std::cout << "point cloud: " << std::endl;
-	for (Point_set::const_iterator it = pcd.begin(); it != pcd.end(); ++it){
-		std::cout << pcd.point(*it) << std::endl;
-	}
-	remove_points_too_far_from_P(pcd, P, 1);
-
-	std::cout << "point cloud: " << std::endl;
-	for (Point_set::const_iterator it = pcd.begin(); it != pcd.end(); ++it){
-		std::cout << pcd.point(*it) << std::endl;
-	}
-
-
-
-
-	// std::list<Point> pcd2;
-	// pcd2.push_back(Point(0.1, 0.1, 0.1));
-	// pcd2.push_back(Point(0.1, 5, 6));
-	// pcd2.push_back(Point(0.1, 7, 6));
-	// pcd2.push_back(Point(0.1, 40, 6));
-	// pcd2.push_back(Point(0.1, 28, 2));
-
-	// // std::list<Point> pts = pcd.points();
-	// TreeNS tree(pcd.points().begin(), pcd.points().end());
-	// Point query(0,0,0);
-	// Neighbor_search search(tree, query, 3);
-
-	// for(Neighbor_search::iterator it = search.begin(); it != search.end(); ++it)
-	// {
-	// 	std::cout << it->first << " "<< std::sqrt(it->second) << std::endl;
-	// }
-
-	std::cout << "test ended" << std::endl;
-}
-
-// int main(int argc, char** argv)
-// {
-// 	// std::cout << "--> program started <--" << std::endl << std::endl;
-
-// 	// std::ifstream is ("input_data/light/custom_mesh_flat.off");
-// 	// Mesh mesh; is >> mesh;
-
-// 	// Point_set pcd;
-// 	// pcd.insert(Point(0,0,1));
-// 	// pcd.insert(Point(0,2,2));
-// 	// pcd.insert(Point(-2,1,3));
-// 	// mean_and_max_distance_from_P_to_mesh(pcd, mesh);
-
-// 	// std::array<double,5> alphas {0.2, 0.4, 0.6, 1.0, 2.0};
-// 	// range_mesh_alpha("pipeline_evaluation/GT-mesh/strasbourg_station.obj", alphas);
-// 	// range_mesh_alpha("pipeline_evaluation/recon-mesh/strasbourg_station-PoissonRecon.obj", alphas);
-// 	// Mesh mesh = read_OBJ_mesh("input_data/heavy/open_data_strasbourg/PC3E45/PC3E45_3.obj");
-// 	// // Mesh mesh = read_OBJ_mesh("input_data/heavy/cow.obj");
-
-// 	// std::cout << "test validity: " << mesh.is_valid(true) << std::endl;
-// 	// std::cout << "test whether it is closed: " << CGAL::is_closed(mesh) << std::endl;
-
-// 	// Point_set pcd;
-// 	// // std::ifstream is_pcd ("output_data/out_cow.off");
-// 	// std::ifstream is_pcd ("output_data/out_origin.ply");
-// 	// // CGAL::read_ply_point_set(is_pcd, pcd);
-// 	// // bool readSuccess = CGAL::read_off_points(is_pcd, )
-// 	// // CGAL::read_off_points(is_pcd, pcd.index_back_inserter());
-// 	// is_pcd >> pcd;
-
-
-// 	// int nbRmVert = PMP::remove_isolated_vertices(mesh);
-// 	// std::cout << nbRmVert << " isolated vertices removed" << std::endl;
-
-// 	// Mesh mesh_alpha = Mesh_alpha(mesh, pcd, 1);
-
-// 	// std::ofstream of("output_data/mesh_alpha_strasbourg.off");
-// 	// write_off(of,mesh_alpha);
-
-// 	// test();
-
-// 	// std::cout << "--> program ended <--" << std::endl;
-// 	return 0;
-// }
