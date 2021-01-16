@@ -3,38 +3,35 @@
 #include <string>
 #include <array>
 #include <map>
-#include <math.h>
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <list>
+#include <cmath>
+
 #include <CGAL/Surface_mesh_shortest_path.h>
+
+// Accelerating data structure
 #include <CGAL/AABB_tree.h>
 #include <CGAL/AABB_face_graph_triangle_primitive.h>
 #include <CGAL/AABB_traits.h>
 
+// Kernel
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+
+// Geometrical objects
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Point_set_3.h>
 
 // Input / Output
-#include <CGAL/Point_set_3/IO.h>
-#include <CGAL/IO/OBJ_reader.h>
-#include <CGAL/IO/PLY_reader.h>
-#include <CGAL/IO/OFF_reader.h>
-#include <CGAL/boost/graph/io.h>
+#include "IO.hpp"
 
 #include <CGAL/boost/graph/iterator.h>
 
-// Polygon_mesh_processing
-#include <CGAL/Polygon_mesh_processing/orientation.h>
-#include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
-#include <CGAL/Polygon_mesh_processing/repair.h>
+// Polygon mesh processing
 #include <CGAL/Polygon_mesh_processing/distance.h>
 
-// neighbor searching
+// Neighbor searching
 #include <CGAL/point_generators_3.h>
 #include <CGAL/Orthogonal_k_neighbor_search.h>
 #include <CGAL/Search_traits_3.h>
-
-#include <list>
-#include <cmath>
 
 
 // kernel
@@ -66,139 +63,7 @@ typedef Neighbor_search::Tree TreeNS;
 
 namespace PMP = CGAL::Polygon_mesh_processing;
 
-std::string getFileExt(const char* fileName) {
-	const std::string s(fileName);
-	size_t i = s.rfind('.', s.length());
-	if (i != std::string::npos) {
-		return(s.substr(i+1, s.length() - i));
-	}
-	return("");
-}
 
-Mesh read_OBJ_mesh(const char* fileName, bool verbose){
-	Mesh mesh;
-
-	// Variables to store polygon soup:
-	std::ifstream is (fileName);
-	std::vector<Point> points;
-	std::vector<std::vector<std::size_t>> polygons;
-
-	if (!CGAL::read_OBJ(is, points, polygons)) std::cerr << "\nERROR: impossible to read mesh\n" << std::endl;
-	if (verbose) std::cout << "number of points: " << points.size() << std::endl;
-	if (verbose) std::cout << "number of polygons: " << polygons.size() << std::endl;
-
-	// Processing polygon soup:
-	if (!PMP::is_polygon_soup_a_polygon_mesh(polygons))
-	{
-		// polygons do not define a valid mesh
-		if (verbose) std::cout << "Warning: [" << fileName << "] does not define a valid polygon mesh " << std::endl;
-		if ( !PMP::orient_polygon_soup(points, polygons) ){ // try to orient
-			// orientation failed
-			if (verbose) std::cout << "Warning: the orientation of the polygon soup [" << fileName << "] failed. => Points were duplicated." << std::endl;
-			if (verbose) std::cout << "Number of points: " << mesh.number_of_vertices() << std::endl;
-			if (verbose) std::cout << "Number of faces: " << mesh.number_of_faces() << std::endl;
-		} else {
-			// orientation succeeded
-			if (verbose) std::cout << "orientation of the polygon soup [" << fileName << "] was a success." << std::endl;
-		}
-	} else {
-		// polygons define a valid mesh
-		if (verbose) std::cout << "Success: [" << fileName << "] defines a valid polygon mesh " << std::endl;
-	}
-
-	PMP::polygon_soup_to_polygon_mesh(points, polygons, mesh);
-
-	return mesh;
-}
-
-Mesh readMesh(const char* fileName, bool verbose){
-	if (verbose) std::cout << "---> READING MESH: " << fileName << std::endl;
-	Mesh mesh; std::ifstream is (fileName);
-
-	// Determine extension then extract points and polygons
-	std::string extension = getFileExt(fileName);
-	if (extension == "obj"){
-		mesh = read_OBJ_mesh(fileName, verbose);
-	} else if (extension == "ply") {
-		if (!read_ply(is, mesh)) std::cerr << "\nERROR: impossible to read mesh\n" << std::endl;
-		// std::vector<Point> points;
-		// std::vector<std::vector<std::size_t>> polygons;
-		// std::vector<CGAL::Color> fcolors;
-		// std::vector<CGAL::Color> vcolors;
-		// bool success = CGAL::read_PLY (is, points, polygons, fcolors, vcolors);
-		// if (success) std::cout << "success" << std::endl;
-		// std::cout << "number of points: " << points.size() << std::endl;
-		// std::cout << "number of polygons: " << polygons.size() << std::endl;
-		// PMP::polygon_soup_to_polygon_mesh(points, polygons, mesh);
-	} else if (extension == "off") {
-		if (!read_off(is, mesh)) std::cerr << "\nERROR: impossible to read mesh\n" << std::endl;
-	} else {
-		std::cout << "\nERROR: extension [." << extension << "] not readable.\n" << std::endl;
-	}
-	if (verbose) std::cout << "Number of points: " << mesh.number_of_vertices() << std::endl;
-	if (verbose) std::cout << "Number of faces: " << mesh.number_of_faces() << std::endl;
-	return mesh;
-}
-
-Point_set readPointSet(const char* fileName, bool verbose){
-	if (verbose) std::cout << "---> READING POINT SET: " << fileName << std::endl;
-	Point_set pcd; std::ifstream is (fileName);
-
-	std::string extension = getFileExt(fileName);
-	if (extension == "ply") {
-		if (!CGAL::read_ply_point_set(is, pcd)) std::cerr
-			<< "\nERROR: impossible to read point set\n" << std::endl;
-	} else if (extension == "off") {
-		if (!CGAL::read_off_point_set(is, pcd)) std::cerr
-			<< "\nERROR: impossible to read mesh\n" << std::endl;
-	} else {
-		std::cerr << "\nERROR: extension [." << extension << "] not readable.\n" << std::endl;
-	}
-	if (verbose) std::cout << "Number of points: " << pcd.number_of_points() << std::endl;
-	return pcd;
-}
-
-void writeMesh(const char* fileName, Mesh &mesh, bool verbose){
-	std::ofstream of(fileName);
-	bool success = false;
-
-	// Determine extension then use appropriate function
-	std::string extension = getFileExt(fileName);
-	if (extension == "ply"){
-		success = write_ply(of, mesh);
-	} else if (extension == "off") {
-		success = write_off(of, mesh);
-	} else {
-		std::cerr << "ERROR: extension [." << extension << "] not writable." << std::endl;
-	}
-	// Outcome:
-	if (success){
-		if (verbose) std::cout << "wrote: " << fileName << std::endl;
-	} else {
-		std::cerr << "ERROR: impossible to write '" << fileName << "'" << std::endl;
-	}
-}
-
-void writePointSet(const char* fileName, Point_set &pcd, bool verbose){
-	std::ofstream of(fileName);
-	bool success = false;
-
-	// Determine extension then use appropriate function
-	std::string extension = getFileExt(fileName);
-	if (extension == "ply"){
-		success = CGAL::write_ply_point_set(of, pcd);
-	} else if (extension == "off") {
-		success = CGAL::write_off_point_set(of, pcd);
-	} else {
-		std::cerr << "ERROR: extension [." << extension << "] not writable." << std::endl;
-	}
-	// Outcome:
-	if (success){
-		if (verbose) std::cout << "wrote: " << fileName << std::endl;
-	} else {
-		std::cerr << "ERROR: impossible to write '" << fileName << "'" << std::endl;
-	}
-}
 
 void build_shortest_path(Point_set &pcd, SM_shortest_path &shortest_paths, bool verbose){
 	if (verbose) std::cout << "---> Building Shortest Path Sequence Tree" << std::endl;
@@ -278,7 +143,7 @@ double geod_or_eucli_distance(bool geodesic,
 	return dist;
 }
 
-Mesh Mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool verbose, bool debug){
+Mesh mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool verbose, bool debug){
 	/*
 		usage:
 			- compute the "reconstructible" part of a mesh based on a
@@ -438,4 +303,3 @@ void mean_and_max_distance_from_P_to_mesh(Point_set &pcd, Mesh &mesh){
 	std::cout << "mean distance: " << mean_distance << std::endl;
 	std::cout << "max distance: " << max_distance << std::endl;
 }
-
