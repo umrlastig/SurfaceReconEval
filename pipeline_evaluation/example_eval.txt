@@ -1,9 +1,8 @@
 # parameters_for_evaluation
 
-GT_MESH=input/strasbourg_station.obj
-GT_LiDAR=input/strasbourg_station-aerial.ply
+GT_MESH=path/to/your/input_mesh.obj
+GT_LiDAR=path/to/your/aerial_lidar.ply
 ALPHAS=1.2|2|3
-A!break!LPHAS=1.2
 PDS_RADIUS=2
 
 # end_of_file

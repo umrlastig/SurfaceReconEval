@@ -29,3 +29,7 @@ CMakeLists.txt.bak
 
 # emacs autosave files :
 \#*#
+
+# template for evaluation
+pipeline_evaluation/eval.txt
+

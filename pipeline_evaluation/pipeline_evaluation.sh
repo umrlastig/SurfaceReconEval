@@ -5,7 +5,7 @@
 
 
 # Files
-param_file="./example_eval.txt" # file to set evaluation parameters
+param_file="./eval.txt" # file to set evaluation parameters
 pds_script="PDS.mlx" # Poisson disk sampling script (meshlabserver)
 ## c++ executables:
 mesh_alpha_exec="./../mesh_alpha"
