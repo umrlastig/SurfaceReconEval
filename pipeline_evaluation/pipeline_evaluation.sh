@@ -6,11 +6,15 @@
 
 # Files
 param_file="./eval.txt" # file to set evaluation parameters
-pds_script="PDS.mlx" # Poisson disk sampling script (meshlabserver)
+
+declare -a FILES
+pds_script="PDS.mlx"; FILES+=($pds_script) # Poisson disk sampling script (meshlabserver)
 ## c++ executables:
-mesh_alpha_exec="./../mesh_alpha"
-remove_points_too_far_from_P="./../remove_points_too_far_from_P"
-mean_and_max_distance_from_P_to_mesh="./../mean_and_max_distance_from_P_to_mesh"
+mesh_alpha_exec="./../compute_mesh_alpha"; FILES+=($mesh_alpha_exec)
+remove_points_too_far_from_P="./../remove_points_too_far_from_P"; FILES+=($remove_points_too_far_from_P)
+mean_and_max_distance_from_P_to_mesh="./../mean_and_max_distance_from_P_to_mesh"; FILES+=($mean_and_max_distance_from_P_to_mesh)
+
+
 
 verbose="0" # set to "1" if desired
 strAlpha="_alpha_"
@@ -186,12 +190,14 @@ do
   if [[ ${line} =~ "GT_MESH" ]]; then
     echo "  > ${line}"
     GT_MESH=$(echo $line| cut -d'=' -f 2)
+    FILES+=($GT_MESH)
   fi
 
   # read LiDAR scan file:
   if [[ ${line} =~ "GT_LiDAR" ]]; then
     echo "  > ${line}"
     GT_LiDAR=$(echo $line| cut -d'=' -f 2)
+    FILES+=($GT_LiDAR)
   fi
 
   # read alpha values:
@@ -217,10 +223,11 @@ done < "${param_file}"
 
 
 # Check existence of files
-echo -e "\nChecking important files:"
-for file in ${GT_MESH} ${GT_LiDAR}; do
+echo -e "\nChecking important files: "
+for file in "${FILES[@]}" ; do
   ./check_file_exists.sh "${file}";
   if [ $? -ne 0 ]; then exit 1; fi # exit on failure of child script
+  echo -n "OK"
 done
 
 
