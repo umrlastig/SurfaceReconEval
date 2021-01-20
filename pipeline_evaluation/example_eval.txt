@@ -1,8 +1,8 @@
 # parameters_for_evaluation
 
-GT_MESH=path/to/your/input_mesh.obj
-GT_LiDAR=path/to/your/aerial_lidar.ply
-ALPHAS=1.2|2|3
-PDS_RADIUS=2
+GT_MESH=example/example.off
+GT_LiDAR=example/example_scan_pts.ply
+ALPHAS=0.5|1|1.5|2
+PDS_RADIUS=0.05
 
 # end_of_file

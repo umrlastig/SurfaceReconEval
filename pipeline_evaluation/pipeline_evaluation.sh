@@ -5,7 +5,13 @@
 
 
 # Files
-param_file="./eval.txt" # file to set evaluation parameters
+if [[ $1 == "--example" ]]; then
+  echo "Running example"
+  param_file="./example_eval.txt" # file to set evaluation parameters
+else  
+  param_file="./eval.txt" # file to set evaluation parameters
+fi
+
 
 declare -a FILES
 pds_script="PDS.mlx"; FILES+=($pds_script) # Poisson disk sampling script (meshlabserver)
@@ -223,12 +229,12 @@ done < "${param_file}"
 
 
 # Check existence of files
-echo -e "\nChecking important files: "
+echo -ne "\nChecking important files: "
 for file in "${FILES[@]}" ; do
   ./check_file_exists.sh "${file}";
   if [ $? -ne 0 ]; then exit 1; fi # exit on failure of child script
-  echo -n "OK"
 done
+echo -ne "OK\n"
 
 
 # Setup sub-directories for a new evaluation:
@@ -267,14 +273,27 @@ GT_LiDAR=${new_LiDAR} # update
 # Prompt the user for copying the meshes to be evaluated in the proper directory
 echo -e "\nCheckings done. Everything has been setup successfully :)"
 echo -e "---------------------------------------------------------\n\n\n"
-echo -e "IMPORTANT! Please COPY THE RESULTS of each surface reconstruction algorithm\
+if [[ $1 == "--example" ]]; then
+  echo "Running example"
+  mesh1="example/PoissonRecon_example.ply"
+  mesh2="example/SSDRecon_example.ply"
+  cmd="cp ${mesh1} ${mesh2} ${EVALUATION}/${DIR_mesh}/"
+  # echo "executing: ${cmd}"
+  eval ${cmd}
+  nb_of_results=$(ls ${EVALUATION}/${DIR_mesh} | wc -l)
+  echo "$((${nb_of_results}-1)) file(s) have been found"
+  read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit 1
+else  
+  echo -e "IMPORTANT! Please COPY THE RESULTS of each surface reconstruction algorithm\
   you have run on '${GT_LiDAR}' and would like to assess into directory:"
-echo -e "\n   ===> ${EVALUATION}/${DIR_mesh}/ <===\n"
-read -p "Done? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit 1
+  echo -e "\n   ===> ${EVALUATION}/${DIR_mesh}/ <===\n"
+  read -p "Done? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit 1
 
-nb_of_results=$(ls ${EVALUATION}/${DIR_mesh} | wc -l)
-echo "${nb_of_results} files have been found, including ground-truth"
-read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit 1
+  nb_of_results=$(ls ${EVALUATION}/${DIR_mesh} | wc -l)
+  echo "$((${nb_of_results}-1)) file(s) have been found" # -1 because ground-truth was also copied automatically
+  read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit 1
+
+fi
 
 echo -e "Started the process"
 
