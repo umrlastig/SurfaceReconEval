@@ -9,6 +9,11 @@ typedef CGAL::Simple_cartesian<double> K;
 typedef K::Point_3 Point;
 typedef CGAL::Surface_mesh<Point> Mesh;
 
+/*
+	Commodity executable to implement convert a mesh from one extension
+	to another one (or just to check if a mesh can be read by CGAL before
+	running the evaluation pipeline, for example)
+*/
 
 int main(int argc, char** argv)
 {

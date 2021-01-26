@@ -154,3 +154,4 @@ void write_point_set(const char* fileName, Point_set &pcd, bool verbose){
 		std::cerr << "ERROR: impossible to write '" << fileName << "'" << std::endl;
 	}
 }
+

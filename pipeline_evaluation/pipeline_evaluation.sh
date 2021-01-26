@@ -286,7 +286,7 @@ if [[ $1 == "--example" ]]; then
 else  
   echo -e "IMPORTANT! Please COPY THE RESULTS of each surface reconstruction algorithm\
   you have run on '${GT_LiDAR}' and would like to assess into directory:"
-  echo -e "\n   ===> ${EVALUATION}/${DIR_mesh}/ <===\n"
+  echo -e "\n   ===> $(pwd)/${EVALUATION}/${DIR_mesh}/ <===\n"
   read -p "Done? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit 1
 
   nb_of_results=$(ls ${EVALUATION}/${DIR_mesh} | wc -l)
@@ -309,8 +309,8 @@ done
 
 ## Assessment
 for file in "${EVALUATION}/${DIR_mesh}"/*; do
-  if [ ${file} != ${GT_MESH} ]; then # do not evaluate ground-truth
-  	func_generate_log_res_file ${file}
+  if [ ${file} != ${GT_MESH} ]; then
+    func_generate_log_res_file ${file}
     func_compute_distances ${file} | tee ${resFile}
   fi
 done

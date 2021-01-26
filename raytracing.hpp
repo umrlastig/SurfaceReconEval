@@ -328,7 +328,12 @@ void add_desired_output_to_pcd(Mesh &mesh, Tree &tree, Point &M, Ray &ray, Point
 	}
 }
 
-Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0, double omega, double theta_0, double freq, int outProperty){
+Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
+													   double omega,
+													   double fov,
+													   double theta_0,
+													   double freq,
+													   int outProperty){
 	/*
 		usage:
 			Simulate an aerial LiDAR acquisition
@@ -336,10 +341,11 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0, double omega, 
 			Mesh mesh: mesh to be raycasted/sampled
 			Point A: starting point of the vehicle
 			Point B: ending point of the vehicle
-			double v0: speed of the vehicle
-			double omega: angular speed of the laser pointer
-			double theta_0: initial angle of the laser pointer
-			double freq: frequency (time resolution) at which
+			double v0: speed of the vehicle [m/s]
+			double omega: angular speed of the laser pointer [rad/s]
+			double fov: field of view of LiDAR scanner [rad]
+			double theta_0: initial angle of the laser pointer [rad]
+			double freq: frequency (time resolution) at which [Hz]
 						 the analysis should be carried out
 			int outProperty: desired property of output point set:
 			 	 	- 0: vertex position ONLY
@@ -359,20 +365,20 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0, double omega, 
 
 	Vector AB = Vector(A,B);
 	Vector vec_i; Vector vec_j; Vector vec_k;
- 	compute_local_frame(AB, vec_i, vec_j, vec_k, false);
+	compute_local_frame(AB, vec_i, vec_j, vec_k, false);
 
- 	Point M; Vector di; Vector dj; Vector ML; double theta; // Some necesary variables
+	Point M; Vector di; Vector dj; Vector ML; double theta; // Some necesary variables
 
- 	double alpha = 90 * M_PI / 180; // max semi-angle for a ray being actually shooted
- 	double tB = sqrt(AB.squared_length()) / v0; // duration of simulation
- 	int nT = (int) (freq * tB); // number of time steps
- 	double dt = tB / (nT-1); // infinitesimal unit of time
- 	double t = 0; // initial time 	
+	double beta = fov / 2; // max semi-angle for a ray being actually shooted
+	double tB = sqrt(AB.squared_length()) / v0; // duration of simulation
+	int nT = (int) (freq * tB); // number of time steps
+	double dt = tB / (nT-1); // infinitesimal unit of time
+	double t = 0; // initial time 	
 
 	for (int ti=0; ti<nT; ti++){
 		theta = omega*t + theta_0; // angular position
 		theta = std::fmod(theta, 2*M_PI); // euclidean division
-		if (theta < alpha || theta > (2*M_PI - alpha)){ // theta is eligible
+		if (theta < beta || theta > (2*M_PI - beta)){ // theta is eligible
 			M = operator+(A, operator*(v0*t, vec_k)); // position of M
 			di = operator*(cos(theta), vec_i);
 			dj = operator*(sin(theta), vec_j);
@@ -476,7 +482,7 @@ void object_raytracing_from_centroid(const char* fileName, int nTheta, int nPhi)
 	write_point_set(outFile, point_set, verbose);
 }
 
-void add_normal_noise(Point_set &pcd, double mu, double sigma){
+void add_depth_normal_noise(Point_set &pcd, double mu, double sigma){
 	/*
 		usage:
 			Add depth-noise (along the ray) folowwing a normal distribution
@@ -512,7 +518,112 @@ void add_normal_noise(Point_set &pcd, double mu, double sigma){
 		Vector d = normalize_vector_3(MPi); // normalized ray
 		double k = normDistri(generator); // scalar following normal distribution
 
-		// translates sample point along the ray by a factor of 'k':
+		// Translates sample point along the ray by a factor of 'k':
 		pcd.point(*it).operator+=( d.operator*=(k) );
 	}
+}
+
+void add_normal_noise(Point_set &pcd, double muXY, double sigmaXY,
+									  double muZ, double sigmaZ){
+	/*
+		usage:
+			Add altimetric and planimetric noise folowwing normal
+			distributions to a given point set.
+		input:
+			Point_set pcd: noise-free point set to which adding the noise
+			double muZ, double sigmaZ: parameters of altimetric error
+			double muXY, double sigmaXY: parameters of planimetric error
+	*/
+	std::cout << "---> Adding planimetric noise (" << muXY <<", " << sigmaXY << ")"
+				<< " and altimetric noise (" << muZ <<", " << sigmaZ << ")"
+				<< " to point set" << std::endl;
+
+	// Normal distributions (mu, sigma):
+	std::default_random_engine generator;
+	std::normal_distribution<double> planimetricError(muXY, sigmaXY);
+	std::normal_distribution<double> altimetricError(muZ, sigmaZ);
+
+	// Browse point set:
+	for (Point_set::const_iterator it = pcd.begin(); it != pcd.end(); it++){
+		Point Pi = pcd.point(*it); // sample point
+
+		// Scalar errors:
+		double dX = planimetricError(generator);
+		double dY = planimetricError(generator);
+		double dZ = altimetricError(generator);
+		Vector d = Vector(dX,dY,dZ);
+		// std::cout <<"["<<dX<<", "<<dY<<", "<<dZ<<"]," << std::endl;
+
+		// Translates sample point along the ray by a factor of 'k':
+		pcd.point(*it).operator+=(d);
+	}
+}
+
+Point_set optical_centers_2_rays(Point_set pcdOC){
+	/*
+		usage:
+			Look for sensor positions in in:pcdOC, computes optical rays
+			and appends them into the normal field of a new point cloud
+			so that optical rays can be visualized as normals in a mesh
+			viewer like Meshlab
+		input:
+			Point_set pcdOC: point cloud which must contain optical centers
+		output:
+			Point_set pcdRays: point cloud with optical rays as normal field
+	*/
+	Point_set pcdRays; pcdRays.add_normal_map();
+
+	// Read optical centers and check validity:
+	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
+	bool success_x = false; bool success_y = false; bool success_z = false;
+	boost::tie(x_origin, success_x) = pcdOC.property_map<double>("x_origin");
+	boost::tie(y_origin, success_y) = pcdOC.property_map<double>("y_origin");
+	boost::tie(z_origin, success_z) = pcdOC.property_map<double>("z_origin");
+	if (!success_x || !success_y || !success_z){
+		std::cerr << "ERROR: optical centers absent from in:pcdOC";
+	}
+
+	// Browse pcdOC:
+	for (Point_set::iterator p = pcdOC.begin(); p != pcdOC.end(); ++p)
+	{
+		Point Pi = pcdOC.point(*p);
+		Point Oi(x_origin[*p], y_origin[*p], z_origin[*p]);
+		Vector PiOi(Pi,Oi);
+		pcdRays.insert(Pi, PiOi);
+	}
+	return pcdRays;
+}
+
+Point_set getOrigins(Point_set pcdOC){
+	/*
+		usage:
+			Look for sensor positions in in:pcdOC and appends them into
+			a new point cloud so that sensor positions can be visualized
+			in a mesh viewer like Meshlab
+		input:
+			Point_set pcdOC: point cloud which must contain optical centers
+		output:
+			Point_set pcdRays: point cloud with optical centers only
+	*/
+	Point_set pcdRays;
+
+	// Read optical centers and check validity:
+	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
+	bool success_x = false; bool success_y = false; bool success_z = false;
+	boost::tie(x_origin, success_x) = pcdOC.property_map<double>("x_origin");
+	boost::tie(y_origin, success_y) = pcdOC.property_map<double>("y_origin");
+	boost::tie(z_origin, success_z) = pcdOC.property_map<double>("z_origin");
+	if (!success_x || !success_y || !success_z){
+		std::cerr << "ERROR: optical centers absent from in:pcdOC";
+	}
+
+	// Browse pcdOC:
+	for (Point_set::iterator p = pcdOC.begin(); p != pcdOC.end(); ++p)
+	{
+		// Point Pi = pcdOC.point(*p);
+		Point Oi(x_origin[*p], y_origin[*p], z_origin[*p]);
+
+		pcdRays.insert(Oi);
+	}
+	return pcdRays;
 }
