@@ -113,11 +113,10 @@ func_process_mesh() {
     inPointSet=${outPointSet}
     outPointSet="${EVALUATION}/${DIR_mesh_alpha_PDS_processed}/${fileName}"
     cmd="${remove_points_too_far_from_P}\
-      ${inPointSet}\
-      ${GT_LiDAR}\
-      ${alpha}\
-      ${outPointSet}\
-      ${verbose}"
+      --input-sampling ${inPointSet}\
+      --input-P ${GT_LiDAR}\
+      --alpha ${alpha}\
+      --output-file ${outPointSet}"
     # echo "executing: ${cmd}"
     eval ${cmd}
   done

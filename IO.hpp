@@ -61,7 +61,7 @@ Mesh read_OBJ_mesh(const char* fileName, bool verbose){
 
 template <typename Mesh, typename Point>
 Mesh read_mesh(const char* fileName, bool verbose){
-	if (verbose) std::cout << "\n---> READING MESH: " << fileName << std::endl;
+	if (verbose) std::cout << "\nREADING MESH: " << fileName << std::endl;
 	Mesh mesh; std::ifstream is (fileName);
 
 	// Determine extension then extract points and polygons
@@ -84,14 +84,14 @@ Mesh read_mesh(const char* fileName, bool verbose){
 	} else {
 		std::cout << "\nERROR: extension [." << extension << "] not readable.\n" << std::endl;
 	}
-	if (verbose) std::cout << "Number of vertices: " << mesh.number_of_vertices() << std::endl;
-	if (verbose) std::cout << "Number of faces: " << mesh.number_of_faces() << std::endl;
+	if (verbose) std::cout << "    Number of vertices: " << mesh.number_of_vertices() << std::endl;
+	if (verbose) std::cout << "    Number of faces: " << mesh.number_of_faces() << std::endl;
 	return mesh;
 }
 
 template <typename Point_set>
 Point_set read_point_set(const char* fileName, bool verbose){
-	if (verbose) std::cout << "---> READING POINT SET: " << fileName << std::endl;
+	if (verbose) std::cout << "READING POINT SET: " << fileName << std::endl;
 	Point_set pcd; std::ifstream is (fileName);
 
 	std::string extension = getFileExt(fileName);
@@ -104,13 +104,14 @@ Point_set read_point_set(const char* fileName, bool verbose){
 	} else {
 		std::cerr << "\nERROR: extension [." << extension << "] not readable.\n" << std::endl;
 	}
-	if (verbose) std::cout << "Number of points: " << pcd.number_of_points() << std::endl;
+	if (verbose) std::cout << "    Number of points: " << pcd.number_of_points() << std::endl;
 	return pcd;
 }
 
 template <typename Mesh>
 void write_mesh(const char* fileName, Mesh &mesh, bool verbose){
 	std::ofstream of(fileName);
+	of.precision(15);
 	bool success = false;
 
 	// Determine extension then use appropriate function
@@ -135,6 +136,7 @@ void write_mesh(const char* fileName, Mesh &mesh, bool verbose){
 template <typename Point_set>
 void write_point_set(const char* fileName, Point_set &pcd, bool verbose){
 	std::ofstream of(fileName);
+	of.precision(15);
 	bool success = false;
 
 	// Determine extension then use appropriate function

@@ -10,8 +10,8 @@ void display_help(char* argv[]){
 		<<"\nwith parameters among the following list:" << std::endl;
 
 	std::cout << "\nMANDATORY parameters:\n"
-		<< " --input-file [ -i ]: the file containing the virtual environment you wish to scan\n"
-		<< " --out-base [ -o ]: the base name of the output files where to store point clouds (with points only, normals, and optical centers"
+		<< " --input-file, -i\n      file containing the virtual environment you wish to scan\n"
+		<< " --out-base, -o\n      base name of the output files where to store point clouds (with points only, normals, and optical centers"
 		<< std::endl;
 
 	std::cout << "\nOPTIONAL parameters:\n"
@@ -149,21 +149,21 @@ int main(int argc, char* argv[])
 		if (verbose) std::cout << "\nPerfect aerial LiDAR scan" << std::endl;
 
 		// points only
-		Point_set pcdPts = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, 0);
+		Point_set pcdPts = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, 0, verbose);
 		write_point_set(outFileP.c_str(), pcdPts, verbose);
 
 		// normals
-		Point_set pcdN = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, 1);
+		Point_set pcdN = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, 1, verbose);
 		write_point_set(outFileN.c_str(), pcdN, verbose);
 
 		// optical centers
-		Point_set pcdOC = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, 2);
+		Point_set pcdOC = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, 2, verbose);
 		write_point_set(outFileOC.c_str(), pcdOC, verbose);
 	} else {
 		if (verbose) std::cout << "\nRealistic aerial LiDAR scan" << std::endl;
 
 		int outProperty = 2;
-		Point_set pcdOC = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, outProperty);
+		Point_set pcdOC = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, outProperty, verbose);
 
 		// normal noise
 		add_normal_noise(pcdOC, muXY, sigmaXY, muZ, sigmaZ);
@@ -173,7 +173,7 @@ int main(int argc, char* argv[])
 
 		// normals
 		int k = 20;
-		Point_set pcdN = compute_and_orient_normals_based_on_origin(pcdOC, k);
+		Point_set pcdN = compute_and_orient_normals_based_on_origin(pcdOC, k, verbose);
 		write_point_set(outFileN.c_str(), pcdN, verbose);
 
 		// points only

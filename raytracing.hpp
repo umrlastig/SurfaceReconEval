@@ -127,7 +127,7 @@ void compute_local_frame(Vector &AB, Vector &vec_i, Vector &vec_j, Vector &vec_k
 	}
 }
 
-void compute_and_orient_normals(Point_set &pcd, unsigned int k){
+void compute_and_orient_normals(Point_set &pcd, unsigned int k, bool verbose){
 	/*
 		Usage:
 			- compute and orient normals of a point set containing optical centers
@@ -141,11 +141,11 @@ void compute_and_orient_normals(Point_set &pcd, unsigned int k){
 			- pcd: input point set containing optical centers
 			- k: number of neighbors for normal computation
 	*/
-	std::cout << "\n---> Point set normal estimation and orientation" << std::endl;
+	if (verbose) std::cout << "\n---> Point set normal estimation and orientation" << std::endl;
 	pcd.add_normal_map();
 
 	// Estimate normals:
-	std::cout << " > normal estimation" << std::endl;
+	if (verbose) std::cout << "     > normal estimation" << std::endl;
 	CGAL::pca_estimate_normals<CGAL::Sequential_tag>(
 									pcd,
 									k,
@@ -159,7 +159,7 @@ void compute_and_orient_normals(Point_set &pcd, unsigned int k){
 	// input points so as to pack all sucessfully oriented
 	// points first, and returns an iterator over the
 	// first point with an unoriented normal
-	std::cout << " > normal orientation" << std::endl;
+	if (verbose) std::cout << "     > normal orientation" << std::endl;
 	Point_set::iterator unoriented_points_begin = CGAL::mst_orient_normals(
 											pcd,
 											k,
@@ -171,11 +171,11 @@ void compute_and_orient_normals(Point_set &pcd, unsigned int k){
 	// Remove points which orientation failed:
 	int nbRmPoints = pcd.end()-unoriented_points_begin;
 	pcd.remove(unoriented_points_begin, pcd.end());
-	std::cout << "Done with point set normal estimation and orientation: "
-				<< nbRmPoints << " points removed" << std::endl << std::endl;
+	if (verbose) std::cout << "     Done with point set normal estimation and orientation: "
+				<< nbRmPoints << " points removed" << std::endl;
 }
 
-Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned int k){
+Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned int k, bool verbose){
 	/*
 		Usage:
 			- compute and orient normals of a point set containing optical centers
@@ -189,11 +189,11 @@ Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned in
 			- outPcd: point set containing the same points as in:pcd but with
 					   oriented normals
 	*/
-	std::cout << "\n---> Point set normal estimation and orientation" << std::endl;
+	if (verbose) std::cout << "\n---> Point set normal estimation and orientation" << std::endl;
 	pcd.add_normal_map();
 
 	// Estimate normals:
-	std::cout << " > normal estimation" << std::endl;
+	if (verbose) std::cout << "     > normal estimation" << std::endl;
 	CGAL::pca_estimate_normals<CGAL::Sequential_tag>(
 									pcd,
 									k,
@@ -216,7 +216,7 @@ Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned in
 	Point_set outPcd; outPcd.add_normal_map();
 
 	// Orient normals:
-	std::cout << " > orientation based on optical centers" << std::endl;
+	if (verbose) std::cout << "     > orientation based on optical centers" << std::endl;
 	for (Point_set::iterator p = pcd.begin(); p != pcd.end(); ++p)
 	{
 		Point Pi = pcd.point(*p);
@@ -232,7 +232,7 @@ Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned in
 	}
 
 	pcd.remove_normal_map();
-	std::cout << "Done with normal estimation and orientation" << std::endl;
+	if (verbose) std::cout << "Done with normal estimation and orientation" << std::endl;
 	return outPcd;
 }
 
@@ -259,7 +259,8 @@ void remove_optical_centers(Point_set &pcd){
 
 Point_set initialize_point_set(int &outProperty, X_Origin_Map &x_origin,
 												 Y_Origin_Map &y_origin,
-												 Z_Origin_Map &z_origin){
+												 Z_Origin_Map &z_origin,
+												 bool verbose){
 	/*
 		Usage: Builds a Point_set object and add properties based on the value
 		of 'outProperty':
@@ -268,16 +269,16 @@ Point_set initialize_point_set(int &outProperty, X_Origin_Map &x_origin,
 			- 2: vertex + OPTICAL CENTER
 	*/
 	Point_set point_set; // for rayshooting output storage
-	std::cout << "Output Point Cloud initialized with: ";
+	if (verbose) std::cout << "     Output Point Cloud initialized with: ";
 	if (outProperty == 0){
-	std::cout << "Vertex position ONLY" << std::endl;
+	if (verbose) std::cout << "Vertex position ONLY" << std::endl;
 
 	} else if (outProperty == 1) {
-		std::cout << "Vertex position + NORMAL" << std::endl;
+		if (verbose) std::cout << "Vertex position + NORMAL" << std::endl;
 		point_set.add_normal_map(); // add normal property
 
 	} else if (outProperty == 2) {
-		std::cout << "Vertex position + OPTICAL CENTER" << std::endl;
+		if (verbose) std::cout << "Vertex position + OPTICAL CENTER" << std::endl;
 		bool success_x = false; bool success_y = false; bool success_z = false;
 		boost::tie (x_origin, success_x) = point_set.add_property_map<double>("x_origin", 0);
 		boost::tie (y_origin, success_y) = point_set.add_property_map<double>("y_origin", 0);
@@ -333,7 +334,8 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
 													   double fov,
 													   double theta_0,
 													   double freq,
-													   int outProperty){
+													   int outProperty,
+													   bool verbose){
 	/*
 		usage:
 			Simulate an aerial LiDAR acquisition
@@ -354,13 +356,13 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
 		output:
 			Point_set point_set: intersections of the rays with the mesh
 	*/
-	std::cout << "\n---> Aerial LiDAR acquisition from A[" << A << "] to B[" << B << "]" << std::endl;
+	if (verbose) std::cout << "\n---> Aerial LiDAR acquisition from A[" << A << "] to B[" << B << "]" << std::endl;
 
 	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
 
 	// Point Set initialization:
 	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
-	Point_set point_set = initialize_point_set(outProperty, x_origin, y_origin, z_origin);
+	Point_set point_set = initialize_point_set(outProperty, x_origin, y_origin, z_origin, false);
 	Point_set positionsM;
 
 	Vector AB = Vector(A,B);
@@ -395,11 +397,11 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
 		t += dt; // update time
 	}
 	write_point_set("output_data/positionsM.ply", positionsM, false);
-	std::cout << "Done with Aerial LiDAR acquisition" << std::endl;
+	if (verbose) std::cout << "Done with Aerial LiDAR acquisition" << std::endl;
 	return point_set;
 }
 
-Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi, int outProperty){
+Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi, int outProperty, bool verbose){
 	/*
 		usage:
 			Shoot rays in all directions from a fixed position in space
@@ -423,7 +425,7 @@ Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi, 
 
 	// Point Set initialization:
 	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
-	Point_set point_set = initialize_point_set(outProperty, x_origin, y_origin, z_origin);
+	Point_set point_set = initialize_point_set(outProperty, x_origin, y_origin, z_origin, verbose);
 
 	double thetaMin=0; double thetaMax=M_PI; // polar angle theta in [0,pi]
 	double phiMin=0; double phiMax=2*M_PI; // azimuthal angle phi in [0,2pi]
@@ -460,7 +462,7 @@ void Strasbourg_Scene_Raytracing(int nTheta, int nPhi, int outProperty){
 	double y_origin = ( bbox.ymin() + bbox.ymax() ) / 2;
 	double z_origin = bbox.zmin() + 3*( bbox.zmax() - bbox.zmin() );
 	Point origin_lidar(x_origin, y_origin, z_origin);
-	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi, outProperty);
+	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi, outProperty, verbose);
 
 	const char* outFileName = "output_data/out_pcd_normal_PC3E45_3.ply";
 	write_point_set(outFileName, point_set, verbose);
@@ -476,7 +478,7 @@ void object_raytracing_from_centroid(const char* fileName, int nTheta, int nPhi)
 
 	Point origin_lidar(centroid(mesh));
 	int outProperty = 2;
-	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi, outProperty);
+	Point_set point_set = spherical_ray_shooting(mesh, origin_lidar, nTheta, nPhi, outProperty, verbose);
 
 	const char* outFile("output_data/tetra_oc.ply");
 	write_point_set(outFile, point_set, verbose);
