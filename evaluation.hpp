@@ -159,7 +159,7 @@ Mesh mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool ve
 			- mesh_alpha: the subset of in:mesh for which triangles are
 						  closer than in:alpha to in:pcd
 	*/
-	if (verbose) std::cout << "\n---> Computing mesh_alpha (reconstructible part of mesh)"
+	if (verbose) std::cout << "\n---> Computing mesh_alpha"
 			  << std::endl;
 	if (geodesic) {
 		if (verbose) std::cout << "     max geodesic distance: " << alpha << std::endl;

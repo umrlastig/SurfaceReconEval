@@ -1,19 +1,21 @@
 #include "evaluation.hpp"
 
 void display_help(){
-	std::cout << "\n========= REMOVE POINTS TOO FAR FROM P =========\n" << std::endl;
+	std::cout << "\n========= REMOVE POINTS TOO FAR FROM P =========\n\n";
 
-	std::cout << "\nMANDATORY parameters:\n"
-		<< " --input-sampling, -iS\n      file containing the sampling you wish to process\n"
-		<< " --input-P, -iP\n      file containing the point cloud P to which distances must be calculated\n"
-		<< " --output-file, -o\n      file where to write processed point cloud (subset of the input sampling)\n"
-		<< " --alpha, -alpha\n      value of alpha parameter"
+	std::cout << "MANDATORY parameters:\n"
+			  << "---------------------\n"
+		<< " --input-sampling, -iS   |    File containing the sampling you wish to process\n"
+		<< " --input-P, -iP          |    File containing the point cloud P to which distances must be computed\n"
+		<< " --output-file, -o       |    File where to write processed point cloud (subset of the input sampling)\n"
+		<< " --alpha, -a             |    Value of alpha parameter\n"
 		<< std::endl;
 
-	std::cout << "\nOPTIONAL parameters:\n"
-		<< " --verbose, -v\n      Display information\n"
-		<< " --debug, -d\n      Display additional information: index of each input sample, nearest neighbor, distance to it and whether it is removed\n"
-		<< " --help, -h\n      Display this information"
+	std::cout << "OPTIONAL parameters:\n"
+			  << "--------------------\n"
+		<< " --verbose, -v           |    Display information throughout execution\n"
+		<< " --debug, -d             |    Display additional information: index of each input sample, nearest neighbor, distance to it and whether it is removed\n"
+		<< " --help, -h              |    Display this information\n"
 		<< std::endl;
 }
 
@@ -38,7 +40,7 @@ int main(int argc, char** argv)
 			PFile = std::string(argv[++i]);
 		} else if (std::string(argv[i]) == "--output-file" || std::string(argv[i]) == "-o"){
 			outFile = argv[++i];
-		} else if (std::string(argv[i]) == "--alpha" || std::string(argv[i]) == "-alpha"){
+		} else if (std::string(argv[i]) == "--alpha" || std::string(argv[i]) == "-a"){
 			alpha = std::atof(argv[++i]);
 		} else if (std::string(argv[i]) == "--verbose" || std::string(argv[i]) == "-v"){
 			verbose = true;
@@ -58,7 +60,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 	if (verbose) std::cout << "verbose flag active" << std::endl;
-	if (debug) std::cout << "debug flag active" << std::endl;
+	if (debug) std::cout << "debug mode active" << std::endl;
 
 	// Read data
 	Point_set pds = read_point_set<Point_set>(samplingFile.c_str(), verbose);

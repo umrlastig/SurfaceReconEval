@@ -1,35 +1,31 @@
 #include "raytracing.hpp"
 
 void display_help(char* argv[]){
-	std::cout << "\n========= LIDAR SCAN SIMULATOR =========\n" << std::endl;
+	std::cout << "\n========= LIDAR SCAN SIMULATOR =========\n\n";
 
-	std::cout << "To display this documentation, type one of the following commands:\n $ "<<argv[0]<<" --help\n"
-													<< " $ "<<argv[0]<<" -h"
-													<< std::endl;
-	std::cout << "\nTo run a simulation, type:\n" << "$ "<<argv[0]
-		<<"\nwith parameters among the following list:" << std::endl;
+	std::cout << "MANDATORY parameters:\n"
+			  << "---------------------\n"
+		<< " --input-file, -i              |    File containing the virtual environment you wish to scan\n"
+		<< " --out-base, -o                |    Base name of the output files where to store point clouds (with points only, normals, and optical centers"
+		<< std::endl << std::endl;
 
-	std::cout << "\nMANDATORY parameters:\n"
-		<< " --input-file, -i\n      file containing the virtual environment you wish to scan\n"
-		<< " --out-base, -o\n      base name of the output files where to store point clouds (with points only, normals, and optical centers"
-		<< std::endl;
-
-	std::cout << "\nOPTIONAL parameters:\n"
-		<< " --extension, -e\n      The extension output files should be exported with ('.ply' or '.off')\n"
-		<< " --perfect-scan, -p\n      No noise is added to point locations and normals are perfect\n"
-		<< " --verbose, -v\n      Display information\n"
-		<< " Flight parameters:\n"
-		<< "  --flying-altitude, -z         [m]\n"
-		<< "  --flying-speed, -v0           [m/s]\n"
+	std::cout << "OPTIONAL parameters:\n"
+			  << "--------------------\n"
+		<< " --extension, -e               |    The extension output files should be exported with ('.ply' or '.off')\n"
+		<< " --perfect-scan, -p            |    No noise is added to point locations and normals are perfect\n"
+		<< " --verbose, -v                 |    Display information throughout execution\n"
+		<< " FLIGHT parameters:\n"
+		<< "  --flying-altitude, -z        |    [m]\n"
+		<< "  --flying-speed, -v0          |    [m/s]\n"
 		<< " LiDAR parameters:\n"
-		<< "  --angular-speed, -omega       [rot/s]\n"
-		<< "  --field-of-view, -fov         [deg]\n"
-		<< "  --pulse-frequency, -fp        [Hz]\n"
-		<< " Noise parameters:\n"
-		<< "  --planimetric-mean, -muXY     [m]\n"
-		<< "  --planimetric-std, -sigmaXY   [m]\n"
-		<< "  --altimetric-mean, -muZ       [m]\n"
-		<< "  --altimetric-std, -sigmaZ     [m]\n"
+		<< "  --angular-speed, -omega      |    [rot/s]\n"
+		<< "  --field-of-view, -fov        |    [deg]\n"
+		<< "  --pulse-frequency, -fp       |    [Hz]\n"
+		<< " NOISE parameters:\n"
+		<< "  --planimetric-mean, -muXY    |    [m]\n"
+		<< "  --planimetric-std, -sigmaXY  |    [m]\n"
+		<< "  --altimetric-mean, -muZ      |    [m]\n"
+		<< "  --altimetric-std, -sigmaZ    |    [m]\n"
 		<< std::endl;
 }
 
