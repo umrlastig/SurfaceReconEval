@@ -159,7 +159,7 @@ Mesh mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool ve
 			- mesh_alpha: the subset of in:mesh for which triangles are
 						  closer than in:alpha to in:pcd
 	*/
-	if (verbose) std::cout << "\n---> Computing mesh_alpha (reconstructible part of mesh)"
+	if (verbose) std::cout << "\n---> Computing mesh_alpha"
 			  << std::endl;
 	if (geodesic) {
 		if (verbose) std::cout << "     max geodesic distance: " << alpha << std::endl;
@@ -240,7 +240,7 @@ Mesh mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool ve
 	return meshAlpha;
 }
 
-void remove_points_too_far_from_P(Point_set &pcd, Point_set &P, double alpha, bool verbose){
+Point_set remove_points_too_far_from_P(Point_set &pcd, Point_set &P, double alpha, bool verbose, bool debug){
 	/*
 		usage:
 			- Remove points from in:pcd that are farther from P than in:alpha
@@ -254,27 +254,29 @@ void remove_points_too_far_from_P(Point_set &pcd, Point_set &P, double alpha, bo
 		<< alpha << " from P" << std::endl;
 
 	TreeNS tree(P.points().begin(), P.points().end());
-	std::vector<Point_set::const_iterator> ptsToRemove;
+	int numR = 0; // store number of points removed
+	Point_set processedPcd;
 
 	for (Point_set::const_iterator pi = pcd.begin(); pi != pcd.end(); ++pi){
 		Point query = pcd.point(*pi);
 		Neighbor_search search(tree, query, 1);
 		Neighbor_search::iterator itS = search.begin(); // only one neighbor
+		double dist = std::sqrt(itS->second);
 
 		// to display point and its distance to nearest neighbor:
-		// std::cout << itS->first << " "<< std::sqrt(itS->second) << std::endl;
-
-		double dist = std::sqrt(itS->second);
+		if (debug) std::cout <<"Query: "<<*pi<<"["<< query << "] | nearest: ["
+			<< itS->first <<"] | distance: "<< dist;
 		if (dist > alpha)
 		{
-			ptsToRemove.push_back(pi); // store point to remove
+			numR++;
+			if (debug) std::cout << " ==> removed\n";
+		} else {
+			processedPcd.insert(Point(query));
+			if (debug) std::cout << " ==> kept\n";
 		}
 	}
-	// remove all points too far:
-	for (int i = 0; i != ptsToRemove.size(); ++i){
-		pcd.remove(*ptsToRemove[i]);
-	}
-	if (verbose) std::cout << "Done: " << ptsToRemove.size() << " point(s) removed" << std::endl;
+	if (verbose) std::cout << "Done: " << numR << " point(s) removed" << std::endl;
+	return processedPcd;
 }
 
 void mean_and_max_distance_from_P_to_mesh(Point_set &pcd, Mesh &mesh){
