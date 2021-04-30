@@ -1,7 +1,7 @@
 #include "raytracing.hpp"
 
 void display_help(char* argv[]){
-	std::cout << "\n========= LIDAR SCAN SIMULATOR =========\n\n";
+	std::cout << "\n========= ELLIPTICAL LIDAR SCAN SIMULATOR =========\n\n";
 
 	std::cout << "MANDATORY parameters:\n"
 			  << "---------------------\n"
@@ -19,7 +19,7 @@ void display_help(char* argv[]){
 		<< "  --flying-speed, -v0          |    [m/s]\n"
 		<< " LiDAR parameters:\n"
 		<< "  --angular-speed, -omega      |    [rot/s]\n"
-		<< "  --field-of-view, -fov        |    [deg]\n"
+		<< "  --angle-from-nadir, -theta   |    [deg]\n"
 		<< "  --pulse-frequency, -fp       |    [Hz]\n"
 		<< " NOISE parameters:\n"
 		<< "  --planimetric-mean, -muXY    |    [m]\n"
@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
 	double altitude = 1000; // [m] 150 --> 1000 for a low-altitude LiDAR
 	double v0 = 60; // [m/s]
 	double omega = 150; // [rotations/s]
-	double fov = 40; // [deg] full angle range
+	double theta = 20; // [deg] angle from nadir
 	double freq = 400000; // [Hz]
 	double theta_0 = 0;
 
@@ -72,8 +72,8 @@ int main(int argc, char* argv[])
 			v0 = std::atof(argv[++i]);
 		} else if (std::string(argv[i]) == "--angular-speed" || std::string(argv[i]) == "-omega"){
 			omega = std::atof(argv[++i]);
-		} else if (std::string(argv[i]) == "--field-of-view" || std::string(argv[i]) == "-fov"){
-			fov = std::atof(argv[++i]);
+		} else if (std::string(argv[i]) == "--angle-from-nadir" || std::string(argv[i]) == "-theta"){
+			theta = std::atof(argv[++i]);
 		} else if (std::string(argv[i]) == "--pulse-frequency" || std::string(argv[i]) == "-fp"){
 			freq = std::atof(argv[++i]);
 		} else if (std::string(argv[i]) == "--perfect-scan" || std::string(argv[i]) == "-p"){
@@ -115,9 +115,9 @@ int main(int argc, char* argv[])
 		}
 		std::cout << " - Flying altitude: " << altitude << " m" << std::endl;
 		std::cout << " - Flying speed: " << v0 << " m/s" << std::endl;
-		std::cout << " - Angular speed: " << omega << " rotations/s ("
-										  << omega/M_PI << " Hz)" << std::endl;
-		std::cout << " - Field of view: " << fov << " deg" << std::endl;
+		std::cout << " - Angular speed (azimuthal): " << omega << " rotations/s ("
+										  << omega * 360 << " deg/s)" << std::endl;
+		std::cout << " - Angle from nadir (theta): " << theta << " deg" << std::endl;
 		std::cout << " - Pulse frequency: " << freq << " Hz" << std::endl;
 	}
 
@@ -126,8 +126,9 @@ int main(int argc, char* argv[])
 	// Starting and ending positions
 	CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh);
 	double xMid = ( bbox.xmin() + bbox.xmax() ) / 2;
-	double yA = bbox.ymin();
-	double yB =  bbox.ymax();
+	double deltaY = bbox.ymax() - bbox.ymin();
+	double yA = bbox.ymin() - 2 * deltaY;
+	double yB =  bbox.ymax() + 2 * deltaY;
 
 	Point A(xMid, yA, altitude);
 	Point B(xMid, yB, altitude);
@@ -139,30 +140,34 @@ int main(int argc, char* argv[])
 
 	// Unit conversions:
 	omega *= 2*M_PI; // from [rot/s] to [rad/s]
-	fov *= M_PI / 180; // from [deg] to [rad]
+	theta *= M_PI / 180; // from [deg] to [rad]
+
+	// change convention for theta: becomes the polar angle
+	theta = M_PI - theta;
+	double phi_0 = 0;
 
 	if (perfectScan){
 		if (verbose) std::cout << "\nPerfect aerial LiDAR scan" << std::endl;
 
 		// points only
-		Point_set pcdPts = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, 0, verbose);
+		Point_set pcdPts = elliptical_aerial_lidar(mesh, A, B, v0, omega, theta, phi_0, freq, 0, verbose);
 		write_point_set(outFileP.c_str(), pcdPts, verbose);
 
 		// normals
-		Point_set pcdN = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, 1, verbose);
+		Point_set pcdN = elliptical_aerial_lidar(mesh, A, B, v0, omega, theta, phi_0, freq, 1, verbose);
 		write_point_set(outFileN.c_str(), pcdN, verbose);
 
 		// optical centers
-		Point_set pcdOC = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, 2, verbose);
+		Point_set pcdOC = elliptical_aerial_lidar(mesh, A, B, v0, omega, theta, phi_0, freq, 2, verbose);
 		write_point_set(outFileOC.c_str(), pcdOC, verbose);
 	} else {
 		if (verbose) std::cout << "\nRealistic aerial LiDAR scan" << std::endl;
 
 		int outProperty = 2;
-		Point_set pcdOC = aerial_lidar(mesh, A, B, v0, omega, fov, theta_0, freq, outProperty, verbose);
+		Point_set pcdOC = elliptical_aerial_lidar(mesh, A, B, v0, omega, theta, phi_0, freq, outProperty, verbose);
 
 		// normal noise
-		add_normal_noise(pcdOC, muXY, sigmaXY, muZ, sigmaZ);
+		add_normal_noise(pcdOC, muXY, sigmaXY, muZ, sigmaZ, verbose);
 
 		// optical centers		
 		write_point_set(outFileOC.c_str(), pcdOC, verbose);

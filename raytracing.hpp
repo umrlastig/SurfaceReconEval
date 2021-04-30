@@ -294,9 +294,12 @@ Point_set initialize_point_set(int &outProperty, X_Origin_Map &x_origin,
 	return point_set;
 }
 
-void add_desired_output_to_pcd(Mesh &mesh, Tree &tree, Point &M, Ray &ray, Point_set &point_set, int &outProperty, X_Origin_Map &x_origin,
-																												   Y_Origin_Map &y_origin,
-																												   Z_Origin_Map &z_origin){
+void add_desired_output_to_pcd(Mesh &mesh, Tree &tree, Point &M, Ray &ray, Point_set &point_set,
+																		   std::vector<face_descriptor> &hitFaces,
+																		   int &outProperty,
+																		   X_Origin_Map &x_origin,
+																		   Y_Origin_Map &y_origin,
+																		   Z_Origin_Map &z_origin){
 	/*
 		Usage: Computes the intersection of the ray with the mesh and adds to the point cloud:
 			   (based on the value of 'outProperty')
@@ -310,7 +313,7 @@ void add_desired_output_to_pcd(Mesh &mesh, Tree &tree, Point &M, Ray &ray, Point
 			const Point& p = boost::get<Point>(intersection->first);
 			if (outProperty == 0){
 				// only add point location:
-				point_set.insert (p);
+				point_set.insert(p);
 
 			} else if (outProperty == 1) {
 				// compute and add corresponding face normal:
@@ -325,11 +328,16 @@ void add_desired_output_to_pcd(Mesh &mesh, Tree &tree, Point &M, Ray &ray, Point
 				y_origin[*it] = M.y();
 				z_origin[*it] = M.z();
 			}
+			const face_descriptor fd = boost::get<face_descriptor>(intersection->second);
+			if (std::find(hitFaces.begin(), hitFaces.end(), fd) == hitFaces.end()){
+				// fd is not already in hitFaces so add it
+				hitFaces.push_back(fd);
+			}
 		}
 	}
 }
 
-Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
+Point_set parallel_line_aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
 													   double omega,
 													   double fov,
 													   double theta_0,
@@ -339,6 +347,7 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
 	/*
 		usage:
 			Simulate an aerial LiDAR acquisition
+			following a parallel-line pattern
 		input:
 			Mesh mesh: mesh to be raycasted/sampled
 			Point A: starting point of the vehicle
@@ -356,9 +365,11 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
 		output:
 			Point_set point_set: intersections of the rays with the mesh
 	*/
-	if (verbose) std::cout << "\n---> Aerial LiDAR acquisition from A[" << A << "] to B[" << B << "]" << std::endl;
+	if (verbose) std::cout << "\n---> Aerial LiDAR acquisition from A[" << A << "] to B[" << B << "]"
+							<< "\nScanning pattern: parallel-line" << std::endl;
 
 	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
+	std::vector<face_descriptor> hitFaces;
 
 	// Point Set initialization:
 	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
@@ -375,12 +386,12 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
 	double tB = sqrt(AB.squared_length()) / v0; // duration of simulation
 	int nT = (int) (freq * tB); // number of time steps
 	double dt = tB / (nT-1); // infinitesimal unit of time
-	double t = 0; // initial time 	
+	double t = 0; // initial time
 
 	for (int ti=0; ti<nT; ti++){
 		theta = omega*t + theta_0; // angular position
 		theta = std::fmod(theta, 2*M_PI); // euclidean division
-		if (theta < beta || theta > (2*M_PI - beta)){ // theta is eligible
+		if (theta <= beta || theta >= (2*M_PI - beta)){ // theta is eligible
 			M = operator+(A, operator*(v0*t, vec_k)); // position of M
 			di = operator*(cos(theta), vec_i);
 			dj = operator*(sin(theta), vec_j);
@@ -388,15 +399,96 @@ Point_set aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
 			positionsM.insert(M);
 			positionsM.insert(operator+(M, 50*ML));
 			Ray ray(M, ML);
-			add_desired_output_to_pcd(mesh, tree, M, ray, point_set, outProperty, x_origin,
-																				  y_origin,
-																				  z_origin);
+			add_desired_output_to_pcd(mesh, tree, M, ray, point_set, hitFaces, outProperty,
+																			   x_origin,
+																			   y_origin,
+																			   z_origin);
 		} else {
 			// do nothing
 		}
 		t += dt; // update time
 	}
 	write_point_set("output_data/positionsM.ply", positionsM, false);
+	double aeraHit = PMP::area(hitFaces, mesh);
+	double aeraTot = PMP::area(mesh);
+	if (verbose) std::cout << "Total area hit during acquisition: "
+		<< aeraHit << " (" << aeraHit / aeraTot * 100 <<' '<<'%'<<" of total)" << std::endl;
+	if (verbose) std::cout << "Done with Aerial LiDAR acquisition" << std::endl;
+	return point_set;
+}
+
+Point_set elliptical_aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
+														double omega,
+														double theta,
+														double phi_0,
+														double freq,
+														int outProperty,
+														bool verbose){
+	/*
+		usage:
+			Simulate an aerial LiDAR acquisition
+			following an elliptical pattern
+		input:
+			Mesh mesh: mesh to be raycasted/sampled
+			Point A: starting point of the vehicle
+			Point B: ending point of the vehicle
+			double v0: speed of the vehicle [m/s]
+			double omega: angular speed of the laser pointer [rad/s]
+			double theta: azimuthal angle of the laser pointer [rad]
+			double phi_0: initial polar angle of the laser pointer [rad]
+			double freq: frequency (time resolution) at which [Hz]
+						 the analysis should be carried out
+			int outProperty: desired property of output point set:
+					- 0: vertex position ONLY
+					- 1: vertex + NORMAL
+					- 2: vertex + OPTICAL CENTER
+		output:
+			Point_set point_set: intersections of the rays with the mesh
+	*/
+	if (verbose) std::cout << "\n---> Aerial LiDAR acquisition from A[" << A << "] to B[" << B << "]"
+							<< "\nScanning pattern: elliptical" << std::endl;
+
+	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
+	std::vector<face_descriptor> hitFaces;
+
+	// Point Set initialization:
+	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
+	Point_set point_set = initialize_point_set(outProperty, x_origin, y_origin, z_origin, false);
+	Point_set positionsM;
+
+	Vector AB = Vector(A,B);
+	Vector vec_i; Vector vec_j; Vector vec_k;
+	compute_local_frame(AB, vec_i, vec_j, vec_k, false);
+
+	Point M; Vector di; Vector dj; Vector dk; Vector ML; double phi; // Some necesary variables
+
+	// double beta = fov / 2; // max semi-angle for a ray being actually shooted
+	double tB = sqrt(AB.squared_length()) / v0; // duration of simulation
+	int nT = (int) (freq * tB); // number of time steps
+	double dt = tB / (nT-1); // infinitesimal unit of time
+	double t = 0; // initial time
+
+	for (int ti=0; ti<nT; ti++){
+		phi = omega*t + phi_0; // angular position
+		phi = std::fmod(phi, 2*M_PI); // euclidean division
+		M = operator+(A, operator*(v0*t, vec_k)); // position of M
+		di = operator*(-cos(theta), vec_i);
+		dj = operator*(-sin(theta)*cos(phi), vec_j);
+		dk = operator*(sin(theta)*sin(phi), vec_k);
+		ML = di.operator+(dj).operator+(dk); // laser pointer
+		positionsM.insert(M);
+		positionsM.insert(operator+(M, 50*ML));
+		Ray ray(M, ML);
+		add_desired_output_to_pcd(mesh, tree, M, ray, point_set, hitFaces, outProperty, x_origin,
+																			  y_origin,
+																			  z_origin);
+		t += dt; // update time
+	}
+	write_point_set("output_data/positionsM.ply", positionsM, false);
+	double aeraHit = PMP::area(hitFaces, mesh);
+	double aeraTot = PMP::area(mesh);
+	if (verbose) std::cout << "Total area hit during acquisition: "
+		<< aeraHit << " (" << aeraHit / aeraTot * 100 <<' '<<'%'<<" of total)" << std::endl;
 	if (verbose) std::cout << "Done with Aerial LiDAR acquisition" << std::endl;
 	return point_set;
 }
@@ -422,6 +514,7 @@ Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi, 
 	std::cout << "\nSpherical Ray Shooting from position [" << origin << "]" << std::endl;
 
 	Tree tree(faces(mesh).first, faces(mesh).second, mesh);
+	std::vector<face_descriptor> hitFaces;
 
 	// Point Set initialization:
 	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
@@ -438,9 +531,11 @@ Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi, 
 			double z = cos(theta);
 			Vector dir = Vector(x,y,z);
 			Ray ray(origin, dir); // ray shooted
-			add_desired_output_to_pcd(mesh, tree, origin, ray, point_set, outProperty, x_origin,
-																					   y_origin,
-																					   z_origin);
+			add_desired_output_to_pcd(mesh, tree, origin, ray, point_set, hitFaces,
+																		  outProperty,
+																		  x_origin,
+																		  y_origin,
+																		  z_origin);
 		}
 	}
 	std::cout << " Done with Spherical Ray Shooting" << std::endl << std::endl;
@@ -484,10 +579,10 @@ void object_raytracing_from_centroid(const char* fileName, int nTheta, int nPhi)
 	write_point_set(outFile, point_set, verbose);
 }
 
-void add_depth_normal_noise(Point_set &pcd, double mu, double sigma){
+void add_depth_normal_noise(Point_set &pcd, double mu, double sigma, bool verbose){
 	/*
 		usage:
-			Add depth-noise (along the ray) folowwing a normal distribution
+			Add depth-noise (along the ray) following a normal distribution
 			of parameters (mu, sigma) to a given point set.
 		input:
 			Point_set pcd: noise-free point set to which adding the noise
@@ -495,7 +590,7 @@ void add_depth_normal_noise(Point_set &pcd, double mu, double sigma){
 								 corresponding optical centers.
 			double mu, double sigma: parameters of the normal distribution
 	*/
-	std::cout << "---> Adding normal noise (" << mu <<", " << sigma << ")"
+	if (verbose) std::cout << "---> Adding normal noise (" << mu <<", " << sigma << ")"
 				<< " to point set" << std::endl;
 
 	// Normal distribution (mu, sigma):
@@ -526,7 +621,8 @@ void add_depth_normal_noise(Point_set &pcd, double mu, double sigma){
 }
 
 void add_normal_noise(Point_set &pcd, double muXY, double sigmaXY,
-									  double muZ, double sigmaZ){
+									  double muZ, double sigmaZ,
+									  bool verbose){
 	/*
 		usage:
 			Add altimetric and planimetric noise folowwing normal
@@ -536,7 +632,7 @@ void add_normal_noise(Point_set &pcd, double muXY, double sigmaXY,
 			double muZ, double sigmaZ: parameters of altimetric error
 			double muXY, double sigmaXY: parameters of planimetric error
 	*/
-	std::cout << "---> Adding planimetric noise (" << muXY <<", " << sigmaXY << ")"
+	if (verbose) std::cout << "\n---> Adding planimetric noise (" << muXY <<", " << sigmaXY << ")"
 				<< " and altimetric noise (" << muZ <<", " << sigmaZ << ")"
 				<< " to point set" << std::endl;
 
