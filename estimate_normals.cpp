@@ -11,7 +11,7 @@ void display_help(char* argv[]){
 
 	std::cout << "OPTIONAL parameter:\n"
 			  << "--------------------\n"
-		<< " --nb-neighbors, -k            |    Number of neighbors to use for normal estimation"
+		<< " --nb-neighbors, -k            |    Number of neighbors to use for normal estimation\n"
 		<< " --verbose, -v                 |    Display information throughout execution"
 		<< std::endl << std::endl;
 }

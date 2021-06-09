@@ -129,12 +129,12 @@ int main(int argc, char* argv[])
 	double yA = bbox.ymin();
 	double yB =  bbox.ymax();
 
-	// Point A(xMid, yA, altitude);
-	// Point B(xMid, yB, altitude);
+	Point A(xMid, yA, altitude);
+	Point B(xMid, yB, altitude);
 
 	// Street positions:
-	Point A(14174.717773, 20500.621094, 144);
-	Point B(14153.132812, 20644.375000, 144);
+	// Point A(14174.717773, 20500.621094, 144);
+	// Point B(14153.132812, 20644.375000, 144);
 
 	// Output file names
 	std::string outFileOC = outBaseName + std::string("_OptCtr") + ext;

@@ -62,7 +62,7 @@ Based on an **mesh**, considered has **ground-truth**, one can simulate an aeria
 </summary>
 <br>
 
-**sim_aerial_lidar** executable takes as input a mesh file, as well as several parameters (description below) and produces three point clouds. The point positions are the same but they differ by the additional information that is provided. Here they are:
+**parallel-line_aerial_lidar** executable takes as input a mesh file, as well as several parameters (description below) and produces three point clouds. The point positions are the same but they differ by the additional information that is provided. Here they are:
 * Point locations only
 * Points + Normals
 * Points + Sensor Positions
@@ -80,6 +80,25 @@ Parameters are:
 - **--flying-speed, -v0** (defaults to 60)
 - **--angular-speed, -omega** (defaults to 150)
 - **--field-of-view, -fov** (defaults to 40)
+- **--pulse-frequency, -fp** (defaults to 400 000)
+- **--planimetric-mean, -muXY** (defaults to 0)
+- **--planimetric-std, -sigmaXY** (defaults to 0.13)
+- **--altimetric-mean, -muZ** (defaults to 0)
+- **--altimetric-std, -sigmaZ** (defaults to 0.05)
+
+**elliptical_aerial_lidar** executable is analogous to parallel-line_aerial_lidar in terms of input/output but the scanning pattern is elliptical.
+
+Parameters are:
+- **--help, -h**: displays help
+- **--input-file, -i**: input mesh file name
+- **--out-base, -o**: a basename for output files (including desired directory)
+- **--extension, -e** for the output files (*.ply* or *.off*) (defaults to *.ply*)
+- **--perfect-scan, -p**: sets flag.
+- **--verbose, -v**: dispays more information throughout execution
+- **--flying-altitude, -z** (defaults to 1000)
+- **--flying-speed, -v0** (defaults to 60)
+- **--angular-speed, -omega** (defaults to 150)
+- **--angle-from-nadir, -theta** (defaults to 20)
 - **--pulse-frequency, -fp** (defaults to 400 000)
 - **--planimetric-mean, -muXY** (defaults to 0)
 - **--planimetric-std, -sigmaXY** (defaults to 0.13)
