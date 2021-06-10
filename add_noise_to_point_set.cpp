@@ -10,6 +10,14 @@ int main(int argc, char* argv[])
 	if (argc != 8)
 	{
 		std::cerr << "ERROR: illegal number of command line arguments to execute " << argv[0]
+		<< "Arguments should be passed in order following:"
+		<< "$1: input point cloud file"
+		<< "$2: output point cloud file"
+		<< "$3: muXY"
+		<< "$4: sigmaXY"
+		<< "$5: muZ"
+		<< "$6: sigmaZ"
+		<< "$7: verbose (\"1\" to activate verbose mode)"
 		<< std::endl;
 		return 1;
 	}
@@ -29,7 +37,7 @@ int main(int argc, char* argv[])
 	if (verbose) std::cout << "verbose flag active" << std::endl;
 
 	Point_set pcd = read_point_set<Point_set>(inFileName, verbose);
-	add_normal_noise(pcd, muXY, sigmaXY, muZ, sigmaZ);
+	add_normal_noise(pcd, muXY, sigmaXY, muZ, sigmaZ, verbose);
 	write_point_set(outFileName, pcd, verbose);
 
 	return 0;

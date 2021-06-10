@@ -23,6 +23,10 @@ add_noise_to_point_set
 bbox
 get_origins
 optical_centers_2_rays
+elliptical_aerial_lidar
+estimate_normals
+parallel-line_aerial_lidar
+test
 
 # cmake-related :
 CMakeLists.txt
@@ -36,4 +40,7 @@ CMakeLists.txt.bak
 
 # template for evaluation
 pipeline_evaluation/eval.txt
+
+# temporary tests file:
+test.cpp
 

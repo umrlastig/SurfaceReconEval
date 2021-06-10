@@ -243,7 +243,7 @@ Mesh mesh_alpha(Mesh &mesh, Point_set &pcd, double alpha, bool geodesic, bool ve
 Point_set remove_points_too_far_from_P(Point_set &pcd, Point_set &P, double alpha, bool verbose, bool debug){
 	/*
 		usage:
-			- Remove points from in:pcd that are farther from P than in:alpha
+			- Remove points from in:pcd that are farther from in:P than in:alpha
 		input:
 			- pcd: a point cloud representing a sampling of a surface
 			- P: the input point cloud used for a reconstruction
