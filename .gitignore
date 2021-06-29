@@ -27,6 +27,7 @@ elliptical_aerial_lidar
 estimate_normals
 parallel-line_aerial_lidar
 test
+evaluate_reconstruction_real_data
 
 # cmake-related :
 CMakeLists.txt
