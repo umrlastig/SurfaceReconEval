@@ -1,5 +1,7 @@
 # Evaluating surface reconstruction from point cloud
-This repository stores source code for the evaluation of surface reconstruction (SR). Two main features are to be considered.
+This repository stores source code for the evaluation of surface reconstruction (SR) according to the paper:
+[Evaluating surface mesh reconstruction of open scenes](https://www.int-arch-photogramm-remote-sens-spatial-inf-sci.net/XLIII-B2-2021/369/2021/) (Y. Marchand, B. Vallet, and L. Caraffa)
+Should you have any problem running the code, please submit an issue or contact me at *yanismarchan@gmail.com*
 
 ## Installation
 <details>
