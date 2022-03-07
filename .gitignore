@@ -28,6 +28,13 @@ estimate_normals
 parallel-line_aerial_lidar
 test
 evaluate_reconstruction_real_data
+Strasbourg_Tetraedre
+cut_point_cloud
+matrix_sub_sampling
+merge_pcds
+
+# abandoned ideas:
+Strasbourg_Tetraedre.cpp
 
 # cmake-related :
 CMakeLists.txt

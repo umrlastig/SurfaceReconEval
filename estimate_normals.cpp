@@ -5,14 +5,16 @@ void display_help(char* argv[]){
 
 	std::cout << "MANDATORY parameters:\n"
 			  << "---------------------\n"
-		<< " --input-file, -i              |    File containing the point cloud of which you wish to estimate normals\n"
-		<< " --output-file, -o             |    Name of the output file where to store point cloud"
+		<< " --input-file , -i              |    File containing the point cloud of which you wish to estimate normals\n"
+		<< " --output-file , -o             |    Name of the output file where to store point cloud"
 		<< std::endl << std::endl;
 
 	std::cout << "OPTIONAL parameter:\n"
 			  << "--------------------\n"
-		<< " --nb-neighbors, -k            |    Number of neighbors to use for normal estimation\n"
-		<< " --verbose, -v                 |    Display information throughout execution"
+		<< " --nb-neighbors , -k            |    Number of neighbors to use for normal estimation\n"
+		<< " --opt-ctrs , -OC               |    Use Optical Centers for normal orientation\n"
+		<< "                                    (OC must be contained in the file as 'property double x_origin, y_origin, z_origin')\n"
+		<< " --verbose , -v                 |    Display information throughout execution"
 		<< std::endl << std::endl;
 }
 
@@ -23,6 +25,7 @@ int main(int argc, char* argv[])
 	std::string outFileName = "";
 	int k = 10;
 	bool verbose = false;
+	bool useOC = false;
 
 	for (int i = 1; i < argc; ++i) {
 		if (std::string(argv[i]) == "--help" || std::string(argv[i]) == "-h"){
@@ -36,6 +39,8 @@ int main(int argc, char* argv[])
 			k = std::atof(argv[++i]);
 		} else if (std::string(argv[i]) == "--verbose" || std::string(argv[i]) == "-v"){
 			verbose = true;
+		} else if (std::string(argv[i]) == "--opt-ctrs" || std::string(argv[i]) == "-OC"){
+			useOC = true;
 		} else {
 			std::cerr << "Invalid option: '" << argv[i] << "'" << std::endl;
 			display_help(argv);
@@ -58,8 +63,15 @@ int main(int argc, char* argv[])
 	}
 
 	Point_set pcd = read_point_set<Point_set>(inFileName.c_str(), verbose);
-	// compute_and_orient_normals(pcd, k, verbose);
-	Point_set outPcd = compute_and_orient_normals_based_on_origin(pcd, k, verbose);
+	Point_set outPcd;
+	if (useOC){
+		if (verbose) 
+		outPcd = compute_and_orient_normals_based_on_origin(pcd, k, verbose);
+	} else {
+		outPcd = pcd;
+		compute_and_orient_normals(outPcd, k, verbose);
+	}
+	
 	write_point_set(outFileName.c_str(), outPcd, verbose);
 
 	return 0;

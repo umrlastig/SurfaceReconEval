@@ -145,7 +145,7 @@ void compute_and_orient_normals(Point_set &pcd, unsigned int k, bool verbose){
 	pcd.add_normal_map();
 
 	// Estimate normals:
-	if (verbose) std::cout << "     > normal estimation" << std::endl;
+	if (verbose) std::cout << "     > normal estimation (using "<<k<<" nearest neighboors)" << std::endl;
 	CGAL::pca_estimate_normals<CGAL::Sequential_tag>(
 									pcd,
 									k,
@@ -204,13 +204,7 @@ Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned in
 
 	// Read optical centers and check validity:
 	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
-	bool success_x = false; bool success_y = false; bool success_z = false;
-	boost::tie(x_origin, success_x) = pcd.property_map<double>("x_origin");
-	boost::tie(y_origin, success_y) = pcd.property_map<double>("y_origin");
-	boost::tie(z_origin, success_z) = pcd.property_map<double>("z_origin");
-	if (!success_x || !success_y || !success_z){
-		std::cerr << "ERROR: optical centers absent from in:pcd";
-	}
+	read_optical_centers(pcd, x_origin, y_origin, z_origin);
 
 	// New point set for output with normals but without optical centers:
 	Point_set outPcd; outPcd.add_normal_map();
@@ -231,7 +225,7 @@ Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned in
 		outPcd.insert(Pi, ni);
 	}
 
-	pcd.remove_normal_map();
+	// pcd.remove_normal_map();
 	if (verbose) std::cout << "Done with normal estimation and orientation" << std::endl;
 	return outPcd;
 }
@@ -240,18 +234,12 @@ void remove_optical_centers(Point_set &pcd){
 
 	// Read optical center property maps and check validity:
 	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
-	bool success_x = false; bool success_y = false; bool success_z = false;
-	boost::tie(x_origin, success_x) = pcd.property_map<double>("x_origin");
-	boost::tie(y_origin, success_y) = pcd.property_map<double>("y_origin");
-	boost::tie(z_origin, success_z) = pcd.property_map<double>("z_origin");
-	if (!success_x || !success_y || !success_z){
-		std::cerr << "ERROR: optical centers absent from in:pcd";
-	}
+	read_optical_centers(pcd, x_origin, y_origin, z_origin);
 	
 	// Remove property maps:
-	success_x = pcd.remove_property_map(x_origin);
-	success_y = pcd.remove_property_map(y_origin);
-	success_z = pcd.remove_property_map(z_origin);
+	bool success_x = pcd.remove_property_map(x_origin);
+	bool success_y = pcd.remove_property_map(y_origin);
+	bool success_z = pcd.remove_property_map(z_origin);
 	if (!success_x || !success_y || !success_z){
 		std::cerr << "ERROR: impossible to remove optical centers from in:pcd";
 	}
@@ -271,13 +259,13 @@ Point_set initialize_point_set(int &outProperty, X_Origin_Map &x_origin,
 	Point_set point_set; // for rayshooting output storage
 	if (verbose) std::cout << "     Output Point Cloud initialized with: ";
 	if (outProperty == 0){
-	if (verbose) std::cout << "Vertex position ONLY" << std::endl;
-
-	} else if (outProperty == 1) {
+		if (verbose) std::cout << "Vertex position ONLY" << std::endl;
+	}
+	if (outProperty == 1 || outProperty == 12) {
 		if (verbose) std::cout << "Vertex position + NORMAL" << std::endl;
 		point_set.add_normal_map(); // add normal property
-
-	} else if (outProperty == 2) {
+	}
+	if (outProperty == 2 || outProperty == 12) {
 		if (verbose) std::cout << "Vertex position + OPTICAL CENTER" << std::endl;
 		bool success_x = false; bool success_y = false; bool success_z = false;
 		boost::tie (x_origin, success_x) = point_set.add_property_map<double>("x_origin", 0);
@@ -286,8 +274,9 @@ Point_set initialize_point_set(int &outProperty, X_Origin_Map &x_origin,
 		if (!success_x || !success_y || !success_z){
 			std::cerr << "ERROR: impossible to add optical center properties";
 		}
-	} else {
-		std::cerr << "ERROR: 'outProperty' argument not valid. Must be 0, 1 or 2" << std::endl;
+	}
+	if (outProperty != 0 && outProperty != 1 && outProperty != 2 && outProperty != 12) {
+		std::cerr << "ERROR: 'outProperty' argument not valid. Must be 0, 1, 2 or 12" << std::endl;
 		std::cerr << " 'outProperty' changed to 0 value" << std::endl;
 		outProperty = 0;
 	}
@@ -314,7 +303,6 @@ void add_desired_output_to_pcd(Mesh &mesh, Tree &tree, Point &M, Ray &ray, Point
 			if (outProperty == 0){
 				// only add point location:
 				point_set.insert(p);
-
 			} else if (outProperty == 1) {
 				// compute and add corresponding face normal:
 				const face_descriptor f = boost::get<face_descriptor>(intersection->second);
@@ -327,6 +315,17 @@ void add_desired_output_to_pcd(Mesh &mesh, Tree &tree, Point &M, Ray &ray, Point
 				x_origin[*it] = M.x();
 				y_origin[*it] = M.y();
 				z_origin[*it] = M.z();
+			} else if (outProperty == 12) {
+				// add position of optical center:
+				Point_set::iterator it = point_set.insert(p);
+				x_origin[*it] = M.x();
+				y_origin[*it] = M.y();
+				z_origin[*it] = M.z();
+
+				// compute and add corresponding face normal:
+				const face_descriptor f = boost::get<face_descriptor>(intersection->second);
+				const Vector n = PMP::compute_face_normal(f,mesh);
+				point_set.normal(*it) = n;
 			}
 			const face_descriptor fd = boost::get<face_descriptor>(intersection->second);
 			if (std::find(hitFaces.begin(), hitFaces.end(), fd) == hitFaces.end()){
@@ -493,7 +492,7 @@ Point_set elliptical_aerial_lidar(Mesh &mesh, Point &A, Point &B, double v0,
 	return point_set;
 }
 
-Point_set spherical_ray_shooting(Mesh mesh, Point origin, int nTheta, int nPhi, int outProperty, bool verbose){
+Point_set spherical_ray_shooting(Mesh &mesh, Point origin, int nTheta, int nPhi, int outProperty, bool verbose){
 	/*
 		usage:
 			Shoot rays in all directions from a fixed position in space
@@ -599,13 +598,7 @@ void add_depth_normal_noise(Point_set &pcd, double mu, double sigma, bool verbos
 
 	// Read optical centers and check validity:
 	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
-	bool success_x = false; bool success_y = false; bool success_z = false;
-	boost::tie(x_origin, success_x) = pcd.property_map<double>("x_origin");
-	boost::tie(y_origin, success_y) = pcd.property_map<double>("y_origin");
-	boost::tie(z_origin, success_z) = pcd.property_map<double>("z_origin");
-	if (!success_x || !success_y || !success_z){
-		std::cerr << "ERROR: optical centers absent from in:pcd";
-	}
+	read_optical_centers(pcd, x_origin, y_origin, z_origin);
 
 	// Browse point set:
 	for (Point_set::const_iterator it = pcd.begin(); it != pcd.end(); it++){
@@ -673,13 +666,7 @@ Point_set optical_centers_2_rays(Point_set pcdOC){
 
 	// Read optical centers and check validity:
 	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
-	bool success_x = false; bool success_y = false; bool success_z = false;
-	boost::tie(x_origin, success_x) = pcdOC.property_map<double>("x_origin");
-	boost::tie(y_origin, success_y) = pcdOC.property_map<double>("y_origin");
-	boost::tie(z_origin, success_z) = pcdOC.property_map<double>("z_origin");
-	if (!success_x || !success_y || !success_z){
-		std::cerr << "ERROR: optical centers absent from in:pcdOC";
-	}
+	read_optical_centers(pcdOC, x_origin, y_origin, z_origin);
 
 	// Browse pcdOC:
 	for (Point_set::iterator p = pcdOC.begin(); p != pcdOC.end(); ++p)
@@ -707,13 +694,7 @@ Point_set getOrigins(Point_set pcdOC){
 
 	// Read optical centers and check validity:
 	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
-	bool success_x = false; bool success_y = false; bool success_z = false;
-	boost::tie(x_origin, success_x) = pcdOC.property_map<double>("x_origin");
-	boost::tie(y_origin, success_y) = pcdOC.property_map<double>("y_origin");
-	boost::tie(z_origin, success_z) = pcdOC.property_map<double>("z_origin");
-	if (!success_x || !success_y || !success_z){
-		std::cerr << "ERROR: optical centers absent from in:pcdOC";
-	}
+	read_optical_centers(pcdOC, x_origin, y_origin, z_origin);
 
 	// Browse pcdOC:
 	for (Point_set::iterator p = pcdOC.begin(); p != pcdOC.end(); ++p)

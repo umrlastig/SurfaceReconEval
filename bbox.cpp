@@ -14,6 +14,7 @@ int main(int argc, char* argv[])
 	CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh);
 	double xMin=bbox.xmin(), yMin=bbox.ymin(), zMin=bbox.zmin();
 	double xMax=bbox.xmax(), yMax=bbox.ymax(), zMax=bbox.zmax();
+	double aeraTot = PMP::area(mesh);
 
 	std::cout << "\n========== Bounding box dimensions ==========\n" << std::endl;
 	std::cout << " Xmin: " << xMin << std::endl;
@@ -28,6 +29,7 @@ int main(int argc, char* argv[])
 	std::cout << " Delta_Z: " << zMax - zMin << std::endl << std::endl;
 
 	std::cout << " Scene area: " << (xMax - xMin) * (yMax - yMin) << std::endl;
+	std::cout << " Total area of triangles: " << aeraTot << std::endl;
 
 	std::cout << "\n=============================================" << std::endl;
 	return 0;

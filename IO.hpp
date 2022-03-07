@@ -21,6 +21,21 @@ std::string getFileExt(const char* fileName) {
 	return("");
 }
 
+template <typename Point_set, typename X_Origin_Map, typename Y_Origin_Map, typename Z_Origin_Map>
+void read_optical_centers(	Point_set &pcd,
+							X_Origin_Map &x_origin,
+							Y_Origin_Map &y_origin,
+							Z_Origin_Map &z_origin)
+{
+	bool success_x = false; bool success_y = false; bool success_z = false;
+	boost::tie(x_origin, success_x) = pcd.template property_map<double>("x_origin");
+	boost::tie(y_origin, success_y) = pcd.template property_map<double>("y_origin");
+	boost::tie(z_origin, success_z) = pcd.template property_map<double>("z_origin");
+	if (!success_x || !success_y || !success_z){
+		std::cerr << "ERROR: optical centers absent from in:pcd";
+	}
+}
+
 
 template <typename Mesh, typename Point>
 Mesh read_OBJ_mesh(const char* fileName, bool verbose){
@@ -62,6 +77,8 @@ Mesh read_OBJ_mesh(const char* fileName, bool verbose){
 template <typename Mesh, typename Point>
 Mesh read_mesh(const char* fileName, bool verbose){
 	if (verbose) std::cout << "\nREADING MESH: " << fileName << std::endl;
+	std::chrono::high_resolution_clock::time_point tic = std::chrono::high_resolution_clock::now(); // TIC
+
 	Mesh mesh; std::ifstream is (fileName);
 
 	// Determine extension then extract points and polygons
@@ -84,14 +101,22 @@ Mesh read_mesh(const char* fileName, bool verbose){
 	} else {
 		std::cout << "\nERROR: extension [." << extension << "] not readable.\n" << std::endl;
 	}
-	if (verbose) std::cout << "    Number of vertices: " << mesh.number_of_vertices() << std::endl;
-	if (verbose) std::cout << "    Number of faces: " << mesh.number_of_faces() << std::endl;
+	std::chrono::high_resolution_clock::time_point toc = std::chrono::high_resolution_clock::now(); // TOC
+	if (verbose){
+		std::cout << "    Number of vertices: " << mesh.number_of_vertices() << std::endl;
+		std::cout << "    Number of faces: " << mesh.number_of_faces() << std::endl;
+		std::cout << "    [elapsed time: "
+			<< std::chrono::duration_cast<std::chrono::milliseconds> (toc - tic).count() * 0.001
+			<< " s]"  << std::endl;
+	}
 	return mesh;
 }
 
 template <typename Point_set>
 Point_set read_point_set(const char* fileName, bool verbose){
 	if (verbose) std::cout << "READING POINT SET: " << fileName << std::endl;
+	std::chrono::high_resolution_clock::time_point tic = std::chrono::high_resolution_clock::now(); // TIC
+
 	Point_set pcd; std::ifstream is (fileName);
 
 	std::string extension = getFileExt(fileName);
@@ -104,12 +129,16 @@ Point_set read_point_set(const char* fileName, bool verbose){
 	} else {
 		std::cerr << "\nERROR: extension [." << extension << "] not readable.\n" << std::endl;
 	}
-	if (verbose) std::cout << "    Number of points: " << pcd.number_of_points() << std::endl;
+	std::chrono::high_resolution_clock::time_point toc = std::chrono::high_resolution_clock::now(); // TOC
+	if (verbose) std::cout << "    Number of points: " << pcd.number_of_points() << " / [elapsed time: "
+			<<std::chrono::duration_cast<std::chrono::milliseconds> (toc - tic).count() * 0.001
+			<< " s]"  << std::endl;
 	return pcd;
 }
 
 template <typename Mesh>
 void write_mesh(const char* fileName, Mesh &mesh, bool verbose){
+	std::chrono::high_resolution_clock::time_point tic = std::chrono::high_resolution_clock::now(); // TIC
 	std::ofstream of(fileName);
 	of.precision(15);
 	bool success = false;
@@ -123,11 +152,14 @@ void write_mesh(const char* fileName, Mesh &mesh, bool verbose){
 	} else {
 		std::cerr << "ERROR: extension [." << extension << "] not writable." << std::endl;
 	}
+	std::chrono::high_resolution_clock::time_point toc = std::chrono::high_resolution_clock::now(); // TOC
 	// Outcome:
 	if (success){
 		if (verbose) std::cout << "\nwrote: '" << fileName
 			<< "' (" << mesh.number_of_vertices() << " vertices / "
-			<< mesh.number_of_faces() << " faces)" << std::endl;
+			<< mesh.number_of_faces() << " faces) / [elapsed time: "
+			<<std::chrono::duration_cast<std::chrono::milliseconds> (toc - tic).count() * 0.001
+			<< " s]" << std::endl;
 	} else {
 		std::cerr << "ERROR: impossible to write '" << fileName << "'" << std::endl;
 	}
@@ -135,6 +167,7 @@ void write_mesh(const char* fileName, Mesh &mesh, bool verbose){
 
 template <typename Point_set>
 void write_point_set(const char* fileName, Point_set &pcd, bool verbose){
+	std::chrono::high_resolution_clock::time_point tic = std::chrono::high_resolution_clock::now(); // TIC
 	std::ofstream of(fileName);
 	of.precision(15);
 	bool success = false;
@@ -148,12 +181,58 @@ void write_point_set(const char* fileName, Point_set &pcd, bool verbose){
 	} else {
 		std::cerr << "ERROR: extension [." << extension << "] not writable." << std::endl;
 	}
+	std::chrono::high_resolution_clock::time_point toc = std::chrono::high_resolution_clock::now(); // TOC
 	// Outcome:
 	if (success){
 		if (verbose) std::cout << "\nwrote: '" << fileName
-			<< "' (" << pcd.number_of_points() << " points)" << std::endl;
+			<< "' (" << pcd.number_of_points() << " points) / [elapsed time: "
+			<<std::chrono::duration_cast<std::chrono::milliseconds> (toc - tic).count() * 0.001
+			<< " s]" << std::endl;
 	} else {
 		std::cerr << "ERROR: impossible to write '" << fileName << "'" << std::endl;
 	}
 }
+
+template <typename Point_set>
+void sub_point_set(std::string inFile, std::string outFile, int ratio){
+	Point_set inPcd = read_point_set<Point_set>(inFile.c_str(), true);
+	Point_set outPcd;
+	int k = 0; // to know if point is kept or not
+	for (typename Point_set::const_iterator pi = inPcd.begin(); pi != inPcd.end(); ++pi){
+		if (k % ratio == 0){
+			outPcd.insert(inPcd.point(*pi));
+		}
+		k++;
+	}
+	write_point_set(outFile.c_str(), outPcd, true);
+}
+
+// template <typename Point_set, typename Point, typename X_Origin_Map, typename Y_Origin_Map, typename Z_Origin_Map>
+// void sub_point_set_with_origin(std::string inFile, std::string outFile, int ratio, Point Ori){
+// 	Point_set inPcd = read_point_set<Point_set>(inFile.c_str(), true);
+// 	Point_set outPcd;
+
+// 	// Add origin properties:
+// 	X_Origin_Map x_origin; Y_Origin_Map y_origin; Z_Origin_Map z_origin;
+// 	bool success_x = false; bool success_y = false; bool success_z = false;
+// 	boost::tie (x_origin, success_x) = outPcd.template add_property_map<double>("x_origin", 0);
+// 	boost::tie (y_origin, success_y) = outPcd.template add_property_map<double>("y_origin", 0);
+// 	boost::tie (z_origin, success_z) = outPcd.template add_property_map<double>("z_origin", 0);
+// 	if (!success_x || !success_y || !success_z){
+// 		std::cerr << "ERROR: impossible to add optical center properties";
+// 	}
+
+// 	int k = 0; // to know if point is kept or not
+// 	for (typename Point_set::const_iterator pi = inPcd.begin(); pi != inPcd.end(); ++pi){
+// 		if (k % ratio == 0){
+// 			typename Point_set::iterator it = outPcd.insert(inPcd.point(*pi));
+// 			x_origin[*it] = Ori.x();
+// 			y_origin[*it] = Ori.y();
+// 			z_origin[*it] = Ori.z();
+// 		}
+// 		k++;
+// 	}
+// 	std::cout << "insertions done, going to write to file."
+// 	write_point_set(outFile.c_str(), outPcd, true);
+// }
 
