@@ -13,7 +13,8 @@ void display_help(char* argv[]){
 			  << "--------------------\n"
 		<< " --nb-neighbors , -k            |    Number of neighbors to use for normal estimation\n"
 		<< " --opt-ctrs , -OC               |    Use Optical Centers for normal orientation\n"
-		<< "                                    (OC must be contained in the file as 'property double x_origin, y_origin, z_origin')\n"
+		<< "                                     (OC must be contained in the file as 'property double x_origin, y_origin, z_origin')\n"
+		<< " --orient-dir-vector , -dir     |    [ dirX dirY dirZ ] Orient normals according to the orientation specified by the three values\n"
 		<< " --verbose , -v                 |    Display information throughout execution"
 		<< std::endl << std::endl;
 }
@@ -26,6 +27,8 @@ int main(int argc, char* argv[])
 	int k = 10;
 	bool verbose = false;
 	bool useOC = false;
+	bool useDirection = false;
+	Vector dir;
 
 	for (int i = 1; i < argc; ++i) {
 		if (std::string(argv[i]) == "--help" || std::string(argv[i]) == "-h"){
@@ -41,6 +44,12 @@ int main(int argc, char* argv[])
 			verbose = true;
 		} else if (std::string(argv[i]) == "--opt-ctrs" || std::string(argv[i]) == "-OC"){
 			useOC = true;
+		} else if (std::string(argv[i]) == "--orient-dir-vector" || std::string(argv[i]) == "-dir"){
+			useDirection = true;
+			double dirX = std::atof(argv[++i]);
+			double dirY = std::atof(argv[++i]);
+			double dirZ = std::atof(argv[++i]);
+			dir = Vector(dirX, dirY, dirZ);
 		} else {
 			std::cerr << "Invalid option: '" << argv[i] << "'" << std::endl;
 			display_help(argv);
@@ -67,6 +76,8 @@ int main(int argc, char* argv[])
 	if (useOC){
 		if (verbose) 
 		outPcd = compute_and_orient_normals_based_on_origin(pcd, k, verbose);
+	} else if (useDirection){ // orientation based on a user-specified direction
+		outPcd = compute_and_orient_normals_based_on_direction(pcd, k, dir, verbose);		
 	} else {
 		outPcd = pcd;
 		compute_and_orient_normals(outPcd, k, verbose);

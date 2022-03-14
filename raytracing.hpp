@@ -230,6 +230,55 @@ Point_set compute_and_orient_normals_based_on_origin(Point_set &pcd, unsigned in
 	return outPcd;
 }
 
+Point_set compute_and_orient_normals_based_on_direction(Point_set &pcd, unsigned int k, Vector dir, bool verbose){
+	/*
+		Usage:
+			- compute and orient normals of a point set containing optical centers
+				o normal estimation: PCA-based
+				o normal orientation:
+					normal n_i and vec(dir) must have positive dot product
+		Input:
+			- pcd: input point set containing optical centers
+			- k: number of neighbors for normal computation
+		Output:
+			- outPcd: point set containing the same points as in:pcd but with
+					   oriented normals
+	*/
+	if (verbose) std::cout << "\n---> Point set normal estimation and orientation" << std::endl;
+	pcd.add_normal_map();
+
+	// Estimate normals:
+	if (verbose) std::cout << "     > normal estimation" << std::endl;
+	CGAL::pca_estimate_normals<CGAL::Sequential_tag>(
+									pcd,
+									k,
+									CGAL::parameters::
+										point_map (pcd.point_map()).
+										normal_map (pcd.normal_map())
+									);
+
+	// New point set for output with normals but without optical centers:
+	Point_set outPcd; outPcd.add_normal_map();
+
+	// Orient normals:
+	if (verbose) std::cout << "     > orientation based on direction: [" << dir << "]" << std::endl;
+	for (Point_set::iterator p = pcd.begin(); p != pcd.end(); ++p)
+	{
+		Point Pi = pcd.point(*p);
+		Vector ni = pcd.normal(*p);
+
+		if (CGAL::scalar_product(ni, dir) < 0) // if normal is mis-oriented
+		{
+			ni.operator*=(-1); // flip normal
+		}
+		outPcd.insert(Pi, ni);
+	}
+
+	// pcd.remove_normal_map();
+	if (verbose) std::cout << "Done with normal estimation and orientation" << std::endl;
+	return outPcd;
+}
+
 void remove_optical_centers(Point_set &pcd){
 
 	// Read optical center property maps and check validity:
