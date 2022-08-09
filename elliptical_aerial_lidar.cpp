@@ -52,7 +52,6 @@ int main(int argc, char* argv[])
 	double omega = 150; // [rotations/s]
 	double theta = 20; // [deg] angle from nadir
 	double freq = 400000; // [Hz]
-	double theta_0 = 0;
 
 	for (int i = 1; i < argc; ++i) {
 		if (std::string(argv[i]) == "--help" || std::string(argv[i]) == "-h"){

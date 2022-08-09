@@ -17,6 +17,7 @@ void display_help(char* argv[]){
 			  << "--------------------\n"
 		<< " --max-distance , -dmax         |    [m] (Threshold distance at which to evaluate the reconstruction)\n"
 		<< " --visual-eval , -visu          |    Flag to generate a quality-related coloured point cloud\n"
+		<< " --export-FP-points , -eFP      |    Flag to generate a point cloud containing the False Positive points\n"
 		<< " --verbose , -v                 |    Flag to display information along the execution\n"
 		<< " --debug , -d                   |    Flag to display additional information along the execution\n"
 		<< std::endl;
@@ -31,7 +32,8 @@ int main(int argc, char* argv[])
 	std::string reconMeshFile = "";
 	std::string outPcdFile = "";
 	double maxDistance = 0.2; // [m]
-	bool visual_eval = false;
+	bool visual_eval = false; // exports a quality-based coloured point cloud
+	bool export_FP_pts = false; // exports False Positive points in a point cloud
 	bool verbose = false;
 	bool debug = false;
 
@@ -51,6 +53,8 @@ int main(int argc, char* argv[])
 			maxDistance = std::atof(argv[++i]);
 		} else if (std::string(argv[i]) == "--visual-eval" || std::string(argv[i]) == "-visu"){
 			visual_eval = true;
+		} else if (std::string(argv[i]) == "--export-FP-points" || std::string(argv[i]) == "-eFP"){
+			export_FP_pts = true;
 		} else if (std::string(argv[i]) == "--debug" || std::string(argv[i]) == "-d"){
 			debug = true;
 		} else if (std::string(argv[i]) == "--verbose" || std::string(argv[i]) == "-v"){
@@ -83,8 +87,8 @@ int main(int argc, char* argv[])
 
 	// Metrics:
 	std::vector<double> distances; // distances of all nearest intersection points between GT ray and reconstructed surface
-	int weakPrecision = 0; // total number of points from recon in front of the closest point from the GT point
-	int recall = 0; // number of points of GT for which ray champfer is above a given threshold
+	int FalPosFront = 0; // total number of points from recon in front of the closest intersection to the GT point
+	int FalPosClosest = 0; // number of closest intersections before Gt and for which ray champfer is above maxDistance
 	int oddIntersections = 0; // number of rays for which the closest intersection with the reconS is odd
 	int intersectedRays = 0; // number of rays that have at least one intersection
 	int nIntervals = 20; // for histogram
@@ -96,7 +100,7 @@ int main(int argc, char* argv[])
 	color_map red, green, blue;
 	add_color_maps(outPcd, red, green, blue);
 
-	Point_set WP_pcd; // Point cloud containing all points that belong to 'WeakPrecision' metric
+	Point_set FP_pcd; // Point cloud containing all False Positive points
 
 	std::string delimiter = "***";
 	int ePos, iPos = 0;
@@ -113,13 +117,14 @@ int main(int argc, char* argv[])
 
 		eval_raytracing_sequential(reconMesh, gtPcd, maxDistance,
 			outPcd, red, green, blue,
-			WP_pcd,
+			FP_pcd,
 			distances,
-			weakPrecision,
-			recall,
+			FalPosFront,
+			FalPosClosest,
 			oddIntersections,
 			intersectedRays,
 			visual_eval,
+			export_FP_pts,
 			debug);
 
 		nbRays+=gtPcd.number_of_points();
@@ -134,17 +139,10 @@ int main(int argc, char* argv[])
 	} while (ePos != gtPcdFiles.size());
 
 	// Print metrics values:
-	print_metrics_values(distances, weakPrecision, recall, oddIntersections, intersectedRays, nbRays, maxDistance, nIntervals);
+	print_metrics_values(distances, FalPosFront, FalPosClosest, oddIntersections, intersectedRays, nbRays, maxDistance, nIntervals);
 
 	if (visual_eval) write_point_set(outPcdFile.c_str(), outPcd, verbose);
-
-	// for (face_descriptor f : faces(reconMesh)){
-	// 	if (PMP::is_degenerate_triangle_face(f, reconMesh)){
-	// 		// std::cout << "Face: " << f << " is degenerate." << std::endl;
-	// 		reconMesh.remove_face(f);
-	// 		// n_degen++;
-	// 	}
-	// }
+	if (export_FP_pts) write_point_set( (outPcdFile.substr(0, outPcdFile.size()-4) + std::string("_FP.ply")).c_str(), FP_pcd, verbose );
 
 	return 0;
 }

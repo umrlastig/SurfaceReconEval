@@ -7,14 +7,16 @@
 # store arguments
 args=("$@")
 executable="./evaluate_reconstruction_real_data"
-visualEvalFlag="--visual-eval"
+#visualEvalFlag="--visual-eval"
+#exportFPPointsFlag="--export-FP-points"
+maxDistance="0.5" # default 0.2
 
 print_help(){
 	echo -e "\n\n      ===> BATCH REAL-DATA EVALUATION <===\n\n"
-	echo -e "--ground-truth-dir , -GT    |    Specify GROUND-TRUTH directory\n"
-	echo -e "--recon-dir , -Rec          |    Specify RECONSTRUCTIONS directory\n"
-	echo -e "--results-dir , -Res        |    Specify where to store NUMERICAL result files\n"
-	echo -e "--visual-eval-dir , -Visu   |    Specify where to store VISUAL result files\n"
+	echo -e "--ground-truth-dir , -GT        |    Specify GROUND-TRUTH directory\n"
+	echo -e "--recon-dir , -Rec              |    Specify RECONSTRUCTIONS directory\n"
+	echo -e "--numerical-results-dir , -Res  |    Specify where to store NUMERICAL result files\n"
+	echo -e "--visual-eval-dir , -Visu       |    Specify where to store VISUAL result files\n"
 }
 
 extract_cmd_line_params() {
@@ -34,9 +36,9 @@ extract_cmd_line_params() {
 		elif [ "${args[${i}]}" = "--recon-dir" ] || [ "${args[${i}]}" = "-Rec" ]; then
 			((i=i+1))
 			ReconDir="${args[${i}]}"			
-		elif [ "${args[${i}]}" = "--results-dir" ] || [ "${args[${i}]}" = "-Res" ]; then
+		elif [ "${args[${i}]}" = "--numerical-results-dir" ] || [ "${args[${i}]}" = "-Res" ]; then
 			((i=i+1))
-			ResultsDir="${args[${i}]}"
+			NumericalResultsDir="${args[${i}]}"
 		elif [ "${args[${i}]}" = "--visual-eval-dir" ] || [ "${args[${i}]}" = "-Visu" ]; then
 			((i=i+1))
 			VisualResDir="${args[${i}]}"
@@ -45,6 +47,7 @@ extract_cmd_line_params() {
 			exit 0
 		else
 			echo "Error: argument '${args[${i}]}' not valid"
+			print_help
 		fi
 	done
 }
@@ -70,9 +73,11 @@ process_meshes(){
 		  --in-gtPcd ${GTFiles}\
 		  --in-recon ${mesh}\
 		  --out-pcd ${VisualResDir}/${meshBasename}_VISU.ply\
+		  --max-distance ${maxDistance}\
 		  ${visualEvalFlag}\
+		  ${exportFPPointsFlag}
 		  ${verboseFlag}\
-		  2>&1 | tee ${ResultsDir}/${meshBasename}_NUM.txt"
+		  2>&1 | tee ${NumericalResultsDir}/${meshBasename}_NUM.txt"
 		# echo -e "---> executing: ${cmd}\n"
 		eval ${cmd}
 	done
@@ -82,7 +87,7 @@ print_general_information(){
 	echo -e "\n\n      ===> BATCH REAL-DATA EVALUATION <===\n\n"
 	echo -e " - Ground-truth directory: ${GTDir}\n"
 	echo -e " - Reconstructions directory: ${ReconDir}\n"
-	echo -e " - Numerical results directory: ${ResultsDir}\n"
+	echo -e " - Numerical results directory: ${NumericalResultsDir}\n"
 	echo -e " - Visual results directory: ${VisualResDir}\n\n"
 	echo -e " - Ground-truth files: ${GTFiles}\n\n"
 }
