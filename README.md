@@ -95,7 +95,9 @@ Parameters are:
 - **--input-file, -i**: input mesh file name
 - **--out-base, -o**: a basename for output files (including desired directory)
 - **--extension, -e** for the output files (*.ply* or *.off*) (defaults to *.ply*)
-- **--perfect-scan, -p**: sets flag.
+- **--noise-free, -nf**: sets flag.
+- **--perfect-normals, -nf**: sets flag.
+- **--use-opt-ctrs , -useOC**: normals are estimated and their orientation is choosen according to the sensor position
 - **--verbose, -v**: dispays more information throughout execution
 - **--flying-altitude, -z** (defaults to 1000)
 - **--flying-speed, -v0** (defaults to 60)
@@ -115,7 +117,7 @@ Parameters are:
 <br>
 
 
-**`./sim_aerial_lidar`**` `**`-i`**` input_data/inFile.ply `**`-o`**` output_data/base `**`-e`**` .ply `**`-v`**
+**`./elliptical_aerial_lidar`**` `**`-i`**` input_data/inFile.ply `**`-o`**` output_data/base `**`-e`**` .ply `**`-v`**
 
 Is going to set the verbose flag, read *input_data/inFile.ply* and produce:
 * *base_OptCtr.ply*
@@ -130,13 +132,12 @@ Is going to set the verbose flag, read *input_data/inFile.ply* and produce:
 </summary>
 <br>
 
-In order to generate a noise-free point cloud, the user just has to add **--perfect-scan** or **-p** to the parameters list. In that case:
-- **Point locations are the exact intersections** of rays with the virtual environment.
-- **Normals are no longer estimated**: the normal corresponding to a given point is the one of the triangle hit by the ray during the scanning process.
+In order to generate a noise-free point cloud, the user just has to add **--noise-free** or **-nf** to the parameters list. In that case, **Point locations are the exact intersections** of rays with the virtual environment.
+In order to generate perfect normals, the user just has to add **--perfect-normals** or **-pn** to the parameters list. In that case, **Normals are no longer estimated**: the normal corresponding to a given point is the one of the triangle hit by the ray during the scanning process.
 </details>
 
 
-## Evaluation pipeline
+## Evaluation from synthetic data
 Move to the proper directory: `cd pipeline_evaluation/` because everything happens there!
 
 <details>
@@ -145,7 +146,7 @@ Move to the proper directory: `cd pipeline_evaluation/` because everything happe
 </summary>
 <br>
 
-In order to run an evaluation pipeline, the user must run each SR algorithm he wishes to assess, keep the resulting mesh files and do the following:
+In order to run an evaluation pipeline, the user must run each SR algorithm they wish to assess, keep the resulting mesh files and do the following:
 1. Create '*eval.txt*' (can be done by copying '*example_eval.txt*') and indicate:
 	* the **file** containing the **ground-truth mesh** you wish to compare your reconstructions to
 	* the **file** containing the **virtual LiDAR scan** on which you run SR algorithms
@@ -170,3 +171,41 @@ For each **α**, precision and recall mean and max distances are provided as def
 You can also check if the pipeline executed successfully by checking the corresponding file in the *logs/* directory (also one log file per evaluated file).
 </details>
 
+## Evaluation from real data
+<details>
+<summary>
+<font size="+2"><b>Start a new evaluation</b></font>
+</summary>
+<br>
+
+In order to run an evaluation, the user must run each SR algorithm they wish to assess, keep the resulting mesh files and do the following:
+1. Create 4 folders:
+	* one containing all the **high quality point clouds** (ground truth) containing the **ground-truth mesh** you wish to use to assess the reconstructions
+	* one containing all the **reconstructed meshes** you wish to assess
+	* one that will be used to store the files containing the **NUMERICAL results** (one per assessed mesh)
+	* one that will be used to store the files containing the **VISUAL results** (two per assessed mesh)
+2. Edit (if desired) `run_batch_eval.sh`:
+	* If you want to generate **quality-based coloured point clouds** => **uncomment** `visualEvalFlag="--visual-eval"`
+	* If you want to generate a point cloud containing all **False Positives** => **uncomment** `exportFPPointsFlag="--export-FP-points"`
+	* If you want to **specify the threshold** (**d<sub>max</sub>**) => **edit** `maxDistance="0.5"` and specify the distance in **metres**
+3. Run `./run_batch_eval.sh` with the following arguments:
+	* --ground-truth-dir , -GT        |    Specify GROUND-TRUTH directory
+	* --recon-dir , -Rec              |    Specify RECONSTRUCTIONS directory
+	* --numerical-results-dir , -Res  |    Specify where to store NUMERICAL result files
+	* --visual-eval-dir , -Visu       |    Specify where to store VISUAL result files
+4. Wait...
+	
+</details>
+
+<details>
+<summary>
+<font size="+2"><b>Extract the results</b></font>
+</summary>
+<br>
+
+When the analysis is finished, you can find the results in the folders you have specified. The name of the files match the ones of the meshes except for the end of it:
+* *_NUM.txt* for **numerical results** (the last line gives the numerical values of the metrics, semicolon-separated, to be easily imported in a spreadsheet)
+* *_VISU.ply* for **quality-based coloured point clouds**
+* *_VISU_FP.ply* for the **point cloud** containing all **False Positives**
+
+</details>
