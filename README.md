@@ -45,9 +45,13 @@ Should you have any problem running the code, please submit an issue or contact 
 
 First, **clone the current repository** and go to the corresponding directory '*SurfaceReconEval/*'
 #### Generate CGAL-specific 'CMakeLists.txt'
-As a *CGAL* project, the project needs a **CMakeLists.txt** which can be generated thanks to a dedicated executable file (*cgal_create_CMakeLists*) provided by CGAL with installation. Actually, this file is provided by this repository but it depends on the version. Best practice is to copy the one stored in your binary folder (something like */usr/local/bin/cgal_create_CMakeLists*). More details can be find [here](https://doc.cgal.org/latest/Manual/installation.html).
-`cp /usr/local/bin/cgal_create_CMakeLists ./path/to/project/`
-From the root of the project ( *SurfaceReconEval/* ), run:
+As a *CGAL* project, the project needs a **CMakeLists.txt** which can be generated thanks to a dedicated executable file (*cgal_create_CMakeLists*) provided by CGAL with installation. Actually, this file is provided by this repository but it depends on the version. Best practice is to copy the one stored:
+
+- [Linux] In your binary folder (something like */usr/local/bin/cgal_create_CMakeLists*).
+- [macOS] In the *scripts* folder of the CGAL folder (*CGAL-5.2/scripts*)
+More details can be find [here](https://doc.cgal.org/latest/Manual/installation.html).
+- Copy the executable file to your copy of the repository: `cp /usr/local/bin/cgal_create_CMakeLists ./path/to/project/`
+- From the root of the project ( *SurfaceReconEval/* ), run:
 `./cgal_create_CMakeLists`
 
 #### Compile the project
