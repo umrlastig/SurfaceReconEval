@@ -13,7 +13,8 @@ Should you have any problem running the code, please submit an issue or contact 
 <br>
 
 - [CMake](https://cmake.org/)
-    - Go to the  [release](https://cmake.org/download/) page to get the latest version
+    - [macOS] `brew install cmake`
+    - [Linux] Go to the  [release](https://cmake.org/download/) page to get the latest version
     - Extract the archive: `tar zxvf cmake-x.xx.x.tar.gz`
     - Compile and install:
         - `cd cmake-x.xx.x/`
@@ -21,7 +22,9 @@ Should you have any problem running the code, please submit an issue or contact 
         - `make`
         - `sudo make install`
 - [CGAL](https://www.cgal.org/) (currently working with *CGAL-5.2*)
-    - Install CGAL dependencies: `sudo apt-get install libgmp-dev libmpfr-dev libboost-all-dev`
+    - Install CGAL dependencies:
+        - [Linux] `sudo apt-get install libgmp-dev libmpfr-dev libboost-all-dev`
+        - [macOS] `brew install gmp mpfr boost`
     - Go to [CGAL release page](https://github.com/CGAL/cgal/releases)
     - Download **CGAL-5.2.tar.xz**
     - Extract its content: `tar xf CGAL-5.2.tar.xz`
@@ -30,7 +33,8 @@ Should you have any problem running the code, please submit an issue or contact 
         - `cmake -DCMAKE_BUILD_TYPE=Release ../`
         - `sudo make install`
 - [MeshLab](https://www.meshlab.net/)
-    - `sudo apt install meshlab`
+    - [Linux] `sudo apt install meshlab`
+    - [macOS] can be downloaded from the [MeshLab release page](https://www.meshlab.net)
 </details>
 
 <details>
